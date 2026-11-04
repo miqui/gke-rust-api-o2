@@ -65,6 +65,20 @@ Read-through / cache-aside for `GetMessage` only, same as Java.
   degrade to the database; a lock timeout skips the cache fill (a writer may be racing). A circuit breaker (5 s) stops hammering a dead Redis.
 * Metrics: `message_cache_seconds{operation,outcome}`, `message_cache_errors_total{operation}`.
 
+#### Redis TLS and Memorystore
+
+Memorystore (in-transit encryption) is reached by its private IP, and its server certificate is issued by a per-instance
+CA that is not in any public root store. So `REDIS_CA_CERT_PATH` pins that CA (chain verification stays on), and because the
+certificate does not carry the instance IP as a subject alternative name, rustls rejects it with `certificate not valid for
+name "<ip>"`. The cluster therefore sets `REDIS_TLS_VERIFY_HOSTNAME=false`: still *only* certificates signed by that
+instance's CA are accepted, so a man-in-the-middle needs a certificate from that CA. The default is strict (`true`).
+Verified with a TLS-only Redis whose certificate has no IP SAN: right CA + `true` -> rejected for the name; right CA +
+`false` -> connected; wrong CA + `false` -> rejected.
+
+The `ring` rustls crypto provider is installed explicitly at startup (`cache::install_crypto_provider`): the dependency tree
+contains both `ring` (sqlx, reqwest) and `aws-lc-rs` (redis), and rustls panics on the first TLS client config when it cannot
+choose, i.e. `REDIS_TLS=true` crashed the process before this.
+
 ### Migrations
 
 `migrate.rs` embeds `migrations/V*.sql` and applies pending ones at startup under a PostgreSQL advisory lock
@@ -87,6 +101,7 @@ Names and secret keys are the same as the Java service so the existing manifests
 | `REDIS_AUTH_STRING` | – | optional |
 | `REDIS_TLS` | `false` | `rediss://`; roots = webpki bundle, plus `REDIS_CA_CERT_PATH` |
 | `REDIS_CA_CERT_PATH` | – | PEM CA for Memorystore |
+| `REDIS_TLS_VERIFY_HOSTNAME` | `true` | `false` skips only the "certificate is valid for this host/IP" check; the chain is still verified against the CA (see below) |
 | `CACHE_TTL_SECONDS` | `3600` | `0` disables expiry |
 | `CACHE_TIMEOUT_MS` | `500` | per Redis operation |
 | `GRPC_PORT` / `MANAGEMENT_PORT` | `9090` / `8081` | |

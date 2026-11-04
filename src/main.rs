@@ -21,6 +21,7 @@ use tokio::sync::watch;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    message_service::cache::install_crypto_provider();
     let cfg = Config::from_env()?;
     let _telemetry = telemetry::init(&cfg)?;
     tracing::info!(

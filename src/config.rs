@@ -23,6 +23,10 @@ pub struct RedisConfig {
     pub auth_string: Option<String>,
     pub tls: bool,
     pub ca_cert_path: Option<String>,
+    /// Verify that the server certificate is valid for `host` (default). The certificate chain is
+    /// verified against the CA either way; see `REDIS_TLS_VERIFY_HOSTNAME` in docs/RUST-SERVICE.md
+    /// for why the cluster sets this to `false` (Memorystore is addressed by private IP).
+    pub tls_verify_hostname: bool,
     /// Safety-net TTL for cache entries; `None` = no expiry (the Java behaviour).
     pub ttl: Option<Duration>,
     /// Upper bound for any single cache round trip.
@@ -109,6 +113,7 @@ impl Config {
                         .filter(|v| !v.is_empty()),
                     tls: boolean("REDIS_TLS", false)?,
                     ca_cert_path: get("REDIS_CA_CERT_PATH").map(str::to_owned),
+                    tls_verify_hostname: boolean("REDIS_TLS_VERIFY_HOSTNAME", true)?,
                     ttl: (ttl_secs > 0).then(|| Duration::from_secs(ttl_secs)),
                     op_timeout: Duration::from_millis(num(
                         get("CACHE_TIMEOUT_MS"),
@@ -194,6 +199,13 @@ mod tests {
         assert_eq!(r.auth_string.as_deref(), Some("s3cret"));
         assert_eq!(r.ca_cert_path.as_deref(), Some("/ca.pem"));
         assert_eq!(r.ttl, Some(Duration::from_secs(3600)));
+        assert!(r.tls_verify_hostname, "strict by default");
+        let c = cfg(&[
+            ("REDIS_HOST", "redis"),
+            ("REDIS_TLS_VERIFY_HOSTNAME", "false"),
+        ])
+        .unwrap();
+        assert!(!c.redis.unwrap().tls_verify_hostname);
     }
 
     #[test]

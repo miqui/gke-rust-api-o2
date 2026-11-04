@@ -1481,6 +1481,7 @@ dependencies = [
  "prost-types 0.14.4",
  "protoc-bin-vendored",
  "redis",
+ "rustls",
  "sqlx",
  "testcontainers",
  "testcontainers-modules",

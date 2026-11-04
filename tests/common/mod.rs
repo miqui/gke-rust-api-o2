@@ -152,6 +152,7 @@ impl TestEnv {
             auth_string: None,
             tls: false,
             ca_cert_path: None,
+            tls_verify_hostname: true,
             ttl: Some(Duration::from_secs(3600)),
             op_timeout: Duration::from_millis(300),
         };

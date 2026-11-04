@@ -64,6 +64,15 @@ struct Inner {
     metrics: Metrics,
 }
 
+/// Installs rustls' `ring` provider as the process default. The dependency tree enables both
+/// `ring` (sqlx, reqwest) and `aws-lc-rs` (redis), so rustls cannot pick one itself and panics on
+/// the first TLS client config ("Could not automatically determine the process-level
+/// CryptoProvider") - i.e. as soon as `REDIS_TLS=true`. Idempotent; an already-installed provider
+/// is fine.
+pub fn install_crypto_provider() {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+}
+
 #[derive(Clone)]
 pub struct MessageCache {
     inner: Option<Arc<Inner>>,
@@ -77,6 +86,9 @@ impl MessageCache {
 
     /// Builds the client only; no connection is attempted here (connects lazily, retries on use).
     pub fn new(cfg: &RedisConfig, metrics: Metrics) -> anyhow::Result<Self> {
+        if cfg.tls {
+            install_crypto_provider();
+        }
         let addr = if cfg.tls {
             ConnectionAddr::TcpTls {
                 host: cfg.host.clone(),
@@ -107,6 +119,17 @@ impl MessageCache {
                 )?
             }
             _ => Client::open(info)?,
+        };
+        // Chain verification (against the CA above, or the webpki roots) always stays on; only
+        // the "certificate is valid for this host name/IP" check is relaxed on request.
+        // build_with_tls resets that flag, so it is applied on the finished connection info.
+        let client = if cfg.tls && !cfg.tls_verify_hostname {
+            let info = client.get_connection_info().clone();
+            let mut addr = info.addr().clone();
+            addr.set_danger_accept_invalid_hostnames(true);
+            Client::open(info.set_addr(addr))?
+        } else {
+            client
         };
         Ok(MessageCache {
             inner: Some(Arc::new(Inner {

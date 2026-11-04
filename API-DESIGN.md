@@ -1,9 +1,13 @@
 # gRPC API Design
 
+> **Note:** the contract, error model and locking semantics below are preserved by the Rust port (see
+> [docs/RUST-SERVICE.md](docs/RUST-SERVICE.md)). Implementation references to Spring Boot / Java classes and to the Hazelcast
+> cache describe the original service; the Rust equivalents are `src/*.rs` and the Redis cache (`src/cache.rs`).
+
 The design of the `message-service` gRPC API: the resources, the conventions every RPC follows, and
 the reasoning behind the parts that aren't obvious (optimistic locking, the error model, the cache,
 and how the cost of a single request is bounded). The contract is
-[`src/main/proto/message/v1/message_service.proto`](src/main/proto/message/v1/message_service.proto)
+[`proto/message/v1/message_service.proto`](proto/message/v1/message_service.proto)
 and is the source of truth for exact shapes; the server serves it through reflection, so
 `grpcurl grpc.miqui.dev:443 describe message.v1.MessageService` always shows the running version.
 Copy-paste calls live in [EXAMPLES.md](EXAMPLES.md).

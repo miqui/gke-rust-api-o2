@@ -1,6 +1,6 @@
-# Local dependencies for `./mvnw spring-boot:run` (defaults in application.yaml match):
+# Local dependencies for `cargo run` (the defaults in src/config.rs match; set REDIS_HOST=localhost to use the cache):
 #
-#   docker compose up -d                      Postgres 16 + Hazelcast (same cluster name as GKE)
+#   docker compose up -d                      Postgres 16 + Redis 7 (Memorystore is Redis on GKE)
 #   docker compose --profile otel up -d       + an OTel Collector exposing what the app pushes
 #                                             as Prometheus metrics on http://localhost:8889/metrics
 #                                             (the same exporter config as the cluster's collector)
@@ -18,12 +18,14 @@ services:
       interval: 5s
       retries: 10
 
-  hazelcast:
-    image: hazelcast/hazelcast:5.7.0-slim
-    environment:
-      HZ_CLUSTERNAME: message-service-cache
+  redis:
+    image: redis:7-alpine
     ports:
-      - "5701:5701"
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
 
   otel-collector:
     profiles: [otel]
