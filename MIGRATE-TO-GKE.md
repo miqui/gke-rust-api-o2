@@ -1,5 +1,9 @@
 # Migrating from kind to GKE — decisions, problems and fixes
 
+> **Historical record.** Written for the previous Python/FastAPI + Hazelcast deployment. The Hazelcast, JVM/JMX and
+> `fastapi-o2` items below no longer apply to the Rust service (cache is Memorystore Redis via Crossplane, see
+> [docs/REDIS-CROSSPLANE.md](docs/REDIS-CROSSPLANE.md)); the GKE, Argo CD, Workload Identity and Gateway lessons still do.
+
 A record of moving this project from a local kind cluster to a dev GKE cluster in project
 `k8s-dev-412419` (2026-09-26): what was decided, and every problem hit during the first real
 deployment, with its symptom, cause and fix. Operating instructions live in

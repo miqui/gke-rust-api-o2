@@ -76,7 +76,7 @@ kubectl exec -n observability openobserve-0 -- du -sh /data/*
 ## Applying the fix (scoped `write_relabel_configs`) and recovering
 
 ```bash
-kubectl apply -k /Users/miqui/development/k8s-fastapi-o2/k8s/observability/
+kubectl apply -k k8s/observability/
 kubectl rollout restart deployment/prometheus -n observability
 kubectl rollout status deployment/prometheus -n observability --timeout=90s
 kubectl delete pod -n observability openobserve-0

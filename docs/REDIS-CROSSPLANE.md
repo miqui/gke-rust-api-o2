@@ -52,6 +52,7 @@ The Deployment maps them to:
 |---|---|
 | `REDIS_HOST` | `redis-connection` `host` |
 | `REDIS_AUTH_STRING` | `redis-connection-auth` `attribute.auth_string` (required, no `optional`) |
+| `REDIS_TLS_VERIFY_HOSTNAME=false` | ConfigMap; Memorystore is reached by IP and its cert has no IP SAN, so only the hostname check is skipped (chain still verified against the instance CA; see docs/RUST-SERVICE.md, "Redis TLS and Memorystore") |
 | `REDIS_PORT=6379`, `REDIS_TLS=true`, `REDIS_CA_CERT_PATH=/etc/redis-ca/ca.crt` | ConfigMap; the CA file is `redis-connection` `ca.crt`, mounted read-only |
 
 `k8s/platform/crossplane-rbac-secrets.yaml` aggregates a ClusterRole so Crossplane may create the composed Secret.

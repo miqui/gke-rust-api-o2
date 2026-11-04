@@ -23,3 +23,6 @@ data:
   REDIS_PORT: "6379"
   REDIS_TLS: "true"
   REDIS_CA_CERT_PATH: "/etc/redis-ca/ca.crt"
+  # Memorystore is addressed by private IP and its certificate has no IP SAN, so the hostname check
+  # is skipped; the chain is still verified against the instance CA above (docs/RUST-SERVICE.md).
+  REDIS_TLS_VERIFY_HOSTNAME: "false"
