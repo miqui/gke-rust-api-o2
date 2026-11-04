@@ -10,9 +10,12 @@
 # Hardening kept regardless: reachable only over private service access (the VPC's peering with
 # Google services - same range as Cloud SQL), AUTH required, TLS required (SERVER_AUTHENTICATION).
 #
-# Connection details written to the Secret named by spec.connectionSecretName (provider-defined
-# keys, see config/redis in provider-upjet-gcp): host, port, server_ca_certs_0_cert and
-# attribute.auth_string.
+# Connection Secrets (provider-upjet-gcp has no custom connection-details config for
+# google_redis_instance, so the provider publishes only the sensitive attribute, as
+# `attribute.auth_string`):
+#   - <connectionSecretName>-auth  written by the provider:  attribute.auth_string
+#   - <connectionSecretName>       composed here (`endpoint`): host, port, ca.crt
+# k8s/deployment.yaml reads the AUTH string from the former and everything else from the latter.
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
 metadata:
@@ -66,15 +69,67 @@ spec:
               - type: FromCompositeFieldPath
                 fromFieldPath: spec.version
                 toFieldPath: spec.forProvider.redisVersion
+              # Provider-written Secret: upjet only publishes *sensitive* Terraform attributes, so
+              # this holds just `attribute.auth_string` (host/port/CA are plain attributes and are
+              # NOT in it - they are published by the `endpoint` resource below).
               - type: FromCompositeFieldPath
                 fromFieldPath: spec.connectionSecretName
                 toFieldPath: spec.writeConnectionSecretToRef.name
+                transforms:
+                  - type: string
+                    string:
+                      type: Format
+                      fmt: "%s-auth"
               - type: ToCompositeFieldPath
                 fromFieldPath: metadata.name
                 toFieldPath: status.instanceName
               - type: ToCompositeFieldPath
                 fromFieldPath: status.atProvider.host
                 toFieldPath: status.host
+              - type: ToCompositeFieldPath
+                fromFieldPath: status.atProvider.port
+                toFieldPath: status.port
+                transforms:
+                  - type: convert
+                    convert:
+                      toType: string
+              - type: ToCompositeFieldPath
+                fromFieldPath: status.atProvider.serverCaCerts[0].cert
+                toFieldPath: status.caCert
+
+          # The app-facing Secret with stable keys: host, port, ca.crt. Rendered from the
+          # Instance's observed status (copied onto the XR status above), so it appears once the
+          # instance is up; until then the pod waits in CreateContainerConfigError.
+          - name: endpoint
+            base:
+              apiVersion: v1
+              kind: Secret
+              type: Opaque
+              stringData:
+                host: ""
+                port: ""
+                ca.crt: ""
+            readinessChecks:
+              - type: None
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.connectionSecretName
+                toFieldPath: metadata.name
+              - type: FromCompositeFieldPath
+                fromFieldPath: status.host
+                toFieldPath: stringData.host
+                policy:
+                  fromFieldPath: Required
+              - type: FromCompositeFieldPath
+                fromFieldPath: status.port
+                toFieldPath: stringData.port
+                policy:
+                  fromFieldPath: Required
+              - type: FromCompositeFieldPath
+                fromFieldPath: status.caCert
+                toFieldPath: stringData["ca.crt"]
+                policy:
+                  fromFieldPath: Required
 
     - step: automatically-detect-ready-composed-resources
       functionRef:

@@ -38,15 +38,23 @@ against the v3.0.0 CRD (`package/crds/redis.gcp.m.upbound.io_instances.yaml`). L
 
 ## Connection Secret
 
-Written to `spec.connectionSecretName` (`redis-connection`) in the same namespace. Keys are
-provider-defined: `host`, `port`, `server_ca_certs_0_cert` (server CA, PEM) and
-`attribute.auth_string` (the AUTH password). The Deployment maps them to:
+Two Secrets in the same namespace (provider-upjet-gcp has no custom connection-details config for
+`google_redis_instance`; upjet publishes only *sensitive* Terraform attributes, as `attribute.<name>`):
+
+| Secret | Written by | Keys |
+|---|---|---|
+| `redis-connection-auth` (`<connectionSecretName>-auth`) | the provider (`writeConnectionSecretToRef`) | `attribute.auth_string` |
+| `redis-connection` (`spec.connectionSecretName`) | the Composition's `endpoint` resource (plain `v1/Secret`, rendered from the Instance's observed `status.atProvider.host/port/serverCaCerts[0].cert`) | `host`, `port`, `ca.crt` |
+
+The Deployment maps them to:
 
 | Env / file | Source |
 |---|---|
-| `REDIS_HOST` | Secret `host` |
-| `REDIS_AUTH_STRING` | Secret `attribute.auth_string` (optional) |
-| `REDIS_PORT=6379`, `REDIS_TLS=true`, `REDIS_CA_CERT_PATH=/etc/redis-ca/ca.crt` | ConfigMap; the CA file is the Secret's `server_ca_certs_0_cert`, mounted read-only |
+| `REDIS_HOST` | `redis-connection` `host` |
+| `REDIS_AUTH_STRING` | `redis-connection-auth` `attribute.auth_string` (required, no `optional`) |
+| `REDIS_PORT=6379`, `REDIS_TLS=true`, `REDIS_CA_CERT_PATH=/etc/redis-ca/ca.crt` | ConfigMap; the CA file is `redis-connection` `ca.crt`, mounted read-only |
+
+`k8s/platform/crossplane-rbac-secrets.yaml` aggregates a ClusterRole so Crossplane may create the composed Secret.
 
 The `wait-for-redis` init container holds the pod until `host:6379` accepts connections.
 
@@ -73,7 +81,7 @@ kubectl get redisinstance                                # SYNCED/READY, INSTANC
 kubectl describe redisinstance messagecache
 kubectl get instances.redis.gcp.m.upbound.io            # the managed resource
 kubectl get managed -n default
-kubectl get secret redis-connection -o jsonpath='{.data}' | jq 'keys'
+kubectl get secret redis-connection redis-connection-auth -o json | jq '.items[].data | keys'
 gcloud redis instances list --region=us-central1
 ```
 
@@ -87,8 +95,12 @@ peering (which would fail while Memorystore or Cloud SQL still used it). Manual:
 
 ## Unverified / watch for on first apply
 
-- The `attribute.auth_string` connection key follows the upjet naming convention for sensitive
-  Terraform attributes; confirm with the `jq 'keys'` command above and adjust the Deployment's
-  `REDIS_AUTH_STRING` key if it differs.
+- Not verifiable without a cluster: that the provider's secret key is exactly `attribute.auth_string`
+  (upjet convention; the provider repo has no Redis-specific connection-details override) and that the
+  composed `v1/Secret` is accepted by Crossplane's RBAC. Check with
+  `kubectl get secret redis-connection-auth redis-connection -o json | jq '.items[].data|keys'`
+  and adjust the Deployment key if it differs. The single-Secret alternative (host/port/authString/ca.crt)
+  needs `function-go-templating` reading the Instance's observed connection details, which Crossplane v2
+  does not reliably pass for namespaced XRs - hence two Secrets.
 - `provider-gcp-redis` v3.0.0 was verified to exist in the provider repo (tag + `cmd/provider/redis`),
   not pulled from the registry.

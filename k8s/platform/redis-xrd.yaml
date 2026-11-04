@@ -57,9 +57,10 @@ spec:
                   enum: [REDIS_6_X, REDIS_7_0, REDIS_7_2]
                 connectionSecretName:
                   description: >-
-                    Secret (same namespace) to write connection details to: host, port,
-                    server_ca_certs_0_cert (the server CA) and attribute.auth_string (the AUTH
-                    password).
+                    Secret (same namespace) the Composition writes with the keys host, port and
+                    ca.crt (the Memorystore server CA, PEM). The AUTH string is written by the
+                    provider to a second Secret named "<connectionSecretName>-auth" under the key
+                    attribute.auth_string.
                   type: string
             status:
               type: object
@@ -67,4 +68,8 @@ spec:
                 instanceName:
                   type: string
                 host:
+                  type: string
+                port:
+                  type: string
+                caCert:
                   type: string

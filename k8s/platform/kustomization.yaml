@@ -15,6 +15,7 @@ kind: Kustomization
 resources:
   - cluster-secret-store.yaml
   - crossplane-runtime-config.yaml
+  - crossplane-rbac-secrets.yaml
   - crossplane-packages.yaml
   - crossplane-provider-config.yaml
   - postgres-xrd.yaml

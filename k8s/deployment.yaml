@@ -138,7 +138,8 @@ spec:
                 secretKeyRef:
                   name: cloudsql-connection
                   key: privateIP
-            # Memorystore private IP + AUTH string, see the wait-for-redis init container.
+            # Memorystore private IP (redis-connection: host) + AUTH string (redis-connection-auth:
+            # attribute.auth_string, written by the provider), see the wait-for-redis init container.
             # REDIS_PORT / REDIS_TLS / REDIS_CA_CERT_PATH come from the ConfigMap.
             - name: REDIS_HOST
               valueFrom:
@@ -148,9 +149,8 @@ spec:
             - name: REDIS_AUTH_STRING
               valueFrom:
                 secretKeyRef:
-                  name: redis-connection
+                  name: redis-connection-auth
                   key: attribute.auth_string
-                  optional: true
             - name: POD_NAME
               valueFrom:
                 fieldRef:
@@ -206,8 +206,8 @@ spec:
           secret:
             secretName: redis-connection
             items:
-              # Crossplane's Memorystore connection Secret key -> a plain ca.crt file.
-              - key: server_ca_certs_0_cert
+              # Composed Secret key -> a plain ca.crt file.
+              - key: ca.crt
                 path: ca.crt
       affinity:
         podAntiAffinity:

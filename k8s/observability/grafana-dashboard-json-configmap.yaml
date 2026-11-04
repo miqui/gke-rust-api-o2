@@ -297,7 +297,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(rate(grpc_server_milliseconds_count{service_name=~\"$service\"}[1m])) by (service_name, rpc_method)",
+              "expr": "sum(rate(grpc_server_seconds_count{service_name=~\"$service\"}[1m])) by (service_name, rpc_method)",
               "legendFormat": "{{service_name}} / {{rpc_method}}",
               "refId": "A"
             }
@@ -319,12 +319,12 @@ data:
           },
           "fieldConfig": {
             "defaults": {
-              "unit": "ms"
+              "unit": "s"
             }
           },
           "targets": [
             {
-              "expr": "sum(rate(grpc_server_milliseconds_sum{service_name=~\"$service\"}[1m])) by (service_name, rpc_method) / sum(rate(grpc_server_milliseconds_count{service_name=~\"$service\"}[1m])) by (service_name, rpc_method)",
+              "expr": "sum(rate(grpc_server_seconds_sum{service_name=~\"$service\"}[1m])) by (service_name, rpc_method) / sum(rate(grpc_server_seconds_count{service_name=~\"$service\"}[1m])) by (service_name, rpc_method)",
               "legendFormat": "{{service_name}} / {{rpc_method}}",
               "refId": "A"
             }
@@ -793,7 +793,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(rate(grpc_server_milliseconds_count{service_name=~\"$service\"}[5m]))",
+              "expr": "sum(rate(grpc_server_seconds_count{service_name=~\"$service\"}[5m]))",
               "refId": "A"
             }
           ]
@@ -814,12 +814,12 @@ data:
           },
           "fieldConfig": {
             "defaults": {
-              "unit": "ms"
+              "unit": "s"
             }
           },
           "targets": [
             {
-              "expr": "histogram_quantile(0.99, sum(rate(grpc_server_milliseconds_bucket{service_name=~\"$service\"}[5m])) by (le))",
+              "expr": "histogram_quantile(0.99, sum(rate(grpc_server_seconds_bucket{service_name=~\"$service\"}[5m])) by (le))",
               "refId": "A"
             }
           ]
@@ -864,7 +864,7 @@ data:
           },
           "targets": [
             {
-              "expr": "(sum(rate(grpc_errors_total{service_name=~\"$service\"}[5m])) or vector(0)) / sum(rate(grpc_server_milliseconds_count{service_name=~\"$service\"}[5m]))",
+              "expr": "(sum(rate(grpc_errors_total{service_name=~\"$service\"}[5m])) or vector(0)) / sum(rate(grpc_server_seconds_count{service_name=~\"$service\"}[5m]))",
               "refId": "A"
             }
           ]
@@ -890,7 +890,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(rate(grpc_server_milliseconds_count{service_name=~\"$service\"}[5m])) by (service_name, rpc_method)",
+              "expr": "sum(rate(grpc_server_seconds_count{service_name=~\"$service\"}[5m])) by (service_name, rpc_method)",
               "legendFormat": "{{service_name}} / {{rpc_method}}",
               "refId": "A"
             }
@@ -912,27 +912,27 @@ data:
           },
           "fieldConfig": {
             "defaults": {
-              "unit": "ms"
+              "unit": "s"
             }
           },
           "targets": [
             {
-              "expr": "histogram_quantile(0.50, sum(rate(grpc_server_milliseconds_bucket{service_name=~\"$service\"}[5m])) by (le))",
+              "expr": "histogram_quantile(0.50, sum(rate(grpc_server_seconds_bucket{service_name=~\"$service\"}[5m])) by (le))",
               "legendFormat": "p50",
               "refId": "A"
             },
             {
-              "expr": "histogram_quantile(0.90, sum(rate(grpc_server_milliseconds_bucket{service_name=~\"$service\"}[5m])) by (le))",
+              "expr": "histogram_quantile(0.90, sum(rate(grpc_server_seconds_bucket{service_name=~\"$service\"}[5m])) by (le))",
               "legendFormat": "p90",
               "refId": "B"
             },
             {
-              "expr": "histogram_quantile(0.95, sum(rate(grpc_server_milliseconds_bucket{service_name=~\"$service\"}[5m])) by (le))",
+              "expr": "histogram_quantile(0.95, sum(rate(grpc_server_seconds_bucket{service_name=~\"$service\"}[5m])) by (le))",
               "legendFormat": "p95",
               "refId": "C"
             },
             {
-              "expr": "histogram_quantile(0.99, sum(rate(grpc_server_milliseconds_bucket{service_name=~\"$service\"}[5m])) by (le))",
+              "expr": "histogram_quantile(0.99, sum(rate(grpc_server_seconds_bucket{service_name=~\"$service\"}[5m])) by (le))",
               "legendFormat": "p99",
               "refId": "D"
             }
@@ -987,7 +987,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(rate(grpc_server_milliseconds_count{service_name=~\"$service\"}[5m]))",
+              "expr": "sum(rate(grpc_server_seconds_count{service_name=~\"$service\"}[5m]))",
               "legendFormat": "requests",
               "refId": "A"
             },
@@ -1014,12 +1014,12 @@ data:
           },
           "fieldConfig": {
             "defaults": {
-              "unit": "ms"
+              "unit": "s"
             }
           },
           "targets": [
             {
-              "expr": "histogram_quantile(0.95, sum(rate(grpc_server_milliseconds_bucket{service_name=~\"$service\"}[5m])) by (le, service_name, rpc_method))",
+              "expr": "histogram_quantile(0.95, sum(rate(grpc_server_seconds_bucket{service_name=~\"$service\"}[5m])) by (le, service_name, rpc_method))",
               "legendFormat": "{{service_name}} / {{rpc_method}}",
               "refId": "A"
             }
@@ -1167,10 +1167,10 @@ data:
               "uid": "prometheus"
             },
             "query": {
-              "query": "label_values(grpc_server_milliseconds_count{service_name=~\"$service\"}, rpc_service)",
+              "query": "label_values(grpc_server_seconds_count{service_name=~\"$service\"}, rpc_service)",
               "refId": "PrometheusVariableQueryEditor-VariableQuery"
             },
-            "definition": "label_values(grpc_server_milliseconds_count{service_name=~\"$service\"}, rpc_service)",
+            "definition": "label_values(grpc_server_seconds_count{service_name=~\"$service\"}, rpc_service)",
             "refresh": 2,
             "sort": 1,
             "multi": true,
@@ -1195,10 +1195,10 @@ data:
               "uid": "prometheus"
             },
             "query": {
-              "query": "label_values(grpc_server_milliseconds_count{service_name=~\"$service\",rpc_service=~\"$rpc_service\"}, rpc_method)",
+              "query": "label_values(grpc_server_seconds_count{service_name=~\"$service\",rpc_service=~\"$rpc_service\"}, rpc_method)",
               "refId": "PrometheusVariableQueryEditor-VariableQuery"
             },
-            "definition": "label_values(grpc_server_milliseconds_count{service_name=~\"$service\",rpc_service=~\"$rpc_service\"}, rpc_method)",
+            "definition": "label_values(grpc_server_seconds_count{service_name=~\"$service\",rpc_service=~\"$rpc_service\"}, rpc_method)",
             "refresh": 2,
             "sort": 1,
             "multi": true,
@@ -1239,7 +1239,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(rate(grpc_server_milliseconds_count{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[5m]))",
+              "expr": "sum(rate(grpc_server_seconds_count{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[5m]))",
               "refId": "A"
             }
           ]
@@ -1268,7 +1268,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(rate(grpc_server_milliseconds_count{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\",rpc_method=~\"(Create|Update|Delete).*\"}[5m])) / sum(rate(grpc_server_milliseconds_count{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[5m]))",
+              "expr": "sum(rate(grpc_server_seconds_count{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\",rpc_method=~\"(Create|Update|Delete).*\"}[5m])) / sum(rate(grpc_server_seconds_count{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[5m]))",
               "refId": "A"
             }
           ]
@@ -1289,12 +1289,12 @@ data:
           },
           "fieldConfig": {
             "defaults": {
-              "unit": "ms"
+              "unit": "s"
             }
           },
           "targets": [
             {
-              "expr": "histogram_quantile(0.95, sum(rate(grpc_server_milliseconds_bucket{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[5m])) by (le))",
+              "expr": "histogram_quantile(0.95, sum(rate(grpc_server_seconds_bucket{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[5m])) by (le))",
               "refId": "A"
             }
           ]
@@ -1315,12 +1315,12 @@ data:
           },
           "fieldConfig": {
             "defaults": {
-              "unit": "ms"
+              "unit": "s"
             }
           },
           "targets": [
             {
-              "expr": "histogram_quantile(0.99, sum(rate(grpc_server_milliseconds_bucket{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[5m])) by (le))",
+              "expr": "histogram_quantile(0.99, sum(rate(grpc_server_seconds_bucket{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[5m])) by (le))",
               "refId": "A"
             }
           ]
@@ -1366,7 +1366,7 @@ data:
           },
           "targets": [
             {
-              "expr": "(sum(rate(grpc_errors_total{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[5m])) or vector(0)) / sum(rate(grpc_server_milliseconds_count{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[5m]))",
+              "expr": "(sum(rate(grpc_errors_total{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[5m])) or vector(0)) / sum(rate(grpc_server_seconds_count{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[5m]))",
               "refId": "A"
             }
           ]
@@ -1388,7 +1388,7 @@ data:
           },
           "targets": [
             {
-              "expr": "count(sum by (rpc_method) (rate(grpc_server_milliseconds_count{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[5m])) > 0) or vector(0)",
+              "expr": "count(sum by (rpc_method) (rate(grpc_server_seconds_count{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[5m])) > 0) or vector(0)",
               "refId": "A"
             }
           ]
@@ -1414,7 +1414,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(rate(grpc_server_milliseconds_count{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[5m])) by (service_name, rpc_method)",
+              "expr": "sum(rate(grpc_server_seconds_count{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[5m])) by (service_name, rpc_method)",
               "legendFormat": "{{service_name}} / {{rpc_method}}",
               "refId": "A"
             }
@@ -1441,7 +1441,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(rate(grpc_server_milliseconds_count{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[5m])) by (service_name, rpc_service)",
+              "expr": "sum(rate(grpc_server_seconds_count{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[5m])) by (service_name, rpc_service)",
               "refId": "A",
               "legendFormat": "{{service_name}} / {{rpc_service}}"
             }
@@ -1463,12 +1463,12 @@ data:
           },
           "fieldConfig": {
             "defaults": {
-              "unit": "ms"
+              "unit": "s"
             }
           },
           "targets": [
             {
-              "expr": "histogram_quantile(0.95, sum(rate(grpc_server_milliseconds_bucket{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[5m])) by (le, service_name, rpc_method))",
+              "expr": "histogram_quantile(0.95, sum(rate(grpc_server_seconds_bucket{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[5m])) by (le, service_name, rpc_method))",
               "legendFormat": "{{service_name}} / {{rpc_method}}",
               "refId": "A"
             }
@@ -1490,12 +1490,12 @@ data:
           },
           "fieldConfig": {
             "defaults": {
-              "unit": "ms"
+              "unit": "s"
             }
           },
           "targets": [
             {
-              "expr": "sum(rate(grpc_server_milliseconds_sum{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[5m])) by (service_name, rpc_method) / sum(rate(grpc_server_milliseconds_count{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[5m])) by (service_name, rpc_method)",
+              "expr": "sum(rate(grpc_server_seconds_sum{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[5m])) by (service_name, rpc_method) / sum(rate(grpc_server_seconds_count{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[5m])) by (service_name, rpc_method)",
               "legendFormat": "{{service_name}} / {{rpc_method}}",
               "refId": "A"
             }
@@ -1519,7 +1519,7 @@ data:
           "options": {
             "calculate": false,
             "yAxis": {
-              "unit": "ms"
+              "unit": "s"
             },
             "cellGap": 1,
             "color": {
@@ -1529,7 +1529,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(increase(grpc_server_milliseconds_bucket{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[$__rate_interval])) by (le)",
+              "expr": "sum(increase(grpc_server_seconds_bucket{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[$__rate_interval])) by (le)",
               "legendFormat": "{{le}}",
               "format": "heatmap",
               "refId": "A"
@@ -1572,7 +1572,7 @@ data:
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "p95 (ms)"
+                  "options": "p95 (s)"
                 },
                 "properties": [
                   {
@@ -1624,7 +1624,7 @@ data:
                 },
                 "renameByName": {
                   "Value #A": "req/s",
-                  "Value #B": "p95 (ms)",
+                  "Value #B": "p95 (s)",
                   "Value #C": "error ratio",
                   "service_name 3": "service",
                   "service_name": "service",
@@ -1647,19 +1647,19 @@ data:
           ],
           "targets": [
             {
-              "expr": "sum(rate(grpc_server_milliseconds_count{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[$__range])) by (service_name, rpc_method)",
+              "expr": "sum(rate(grpc_server_seconds_count{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[$__range])) by (service_name, rpc_method)",
               "format": "table",
               "instant": true,
               "refId": "A"
             },
             {
-              "expr": "histogram_quantile(0.95, sum(rate(grpc_server_milliseconds_bucket{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[$__range])) by (le, service_name, rpc_method))",
+              "expr": "histogram_quantile(0.95, sum(rate(grpc_server_seconds_bucket{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[$__range])) by (le, service_name, rpc_method))",
               "format": "table",
               "instant": true,
               "refId": "B"
             },
             {
-              "expr": "(sum(rate(grpc_errors_total{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[$__range])) by (service_name, rpc_method) or (sum(rate(grpc_server_milliseconds_count{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[$__range])) by (service_name, rpc_method) * 0)) / sum(rate(grpc_server_milliseconds_count{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[$__range])) by (service_name, rpc_method)",
+              "expr": "(sum(rate(grpc_errors_total{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[$__range])) by (service_name, rpc_method) or (sum(rate(grpc_server_seconds_count{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[$__range])) by (service_name, rpc_method) * 0)) / sum(rate(grpc_server_seconds_count{service_name=~\"$service\",rpc_service=~\"$rpc_service\",rpc_method=~\"$rpc_method\"}[$__range])) by (service_name, rpc_method)",
               "format": "table",
               "instant": true,
               "refId": "C"
@@ -1720,10 +1720,10 @@ data:
               "uid": "prometheus"
             },
             "query": {
-              "query": "label_values(grpc_server_milliseconds_count{service_name=~\"$service\"}, rpc_method)",
+              "query": "label_values(grpc_server_seconds_count{service_name=~\"$service\"}, rpc_method)",
               "refId": "PrometheusVariableQueryEditor-VariableQuery"
             },
-            "definition": "label_values(grpc_server_milliseconds_count{service_name=~\"$service\"}, rpc_method)",
+            "definition": "label_values(grpc_server_seconds_count{service_name=~\"$service\"}, rpc_method)",
             "refresh": 2,
             "sort": 1,
             "multi": true,
@@ -1811,7 +1811,7 @@ data:
           },
           "targets": [
             {
-              "expr": "(sum(rate(grpc_errors_total{service_name=~\"$service\",rpc_method=~\"$rpc_method\",error_code=~\"$error_code\"}[5m])) or vector(0)) / sum(rate(grpc_server_milliseconds_count{service_name=~\"$service\",rpc_method=~\"$rpc_method\"}[5m]))",
+              "expr": "(sum(rate(grpc_errors_total{service_name=~\"$service\",rpc_method=~\"$rpc_method\",error_code=~\"$error_code\"}[5m])) or vector(0)) / sum(rate(grpc_server_seconds_count{service_name=~\"$service\",rpc_method=~\"$rpc_method\"}[5m]))",
               "refId": "A"
             }
           ]
@@ -1967,7 +1967,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(rate(grpc_errors_total{service_name=~\"$service\",rpc_method=~\"$rpc_method\",error_code=~\"$error_code\"}[5m])) by (service_name, rpc_method) / sum(rate(grpc_server_milliseconds_count{service_name=~\"$service\",rpc_method=~\"$rpc_method\"}[5m])) by (service_name, rpc_method)",
+              "expr": "sum(rate(grpc_errors_total{service_name=~\"$service\",rpc_method=~\"$rpc_method\",error_code=~\"$error_code\"}[5m])) by (service_name, rpc_method) / sum(rate(grpc_server_seconds_count{service_name=~\"$service\",rpc_method=~\"$rpc_method\"}[5m])) by (service_name, rpc_method)",
               "legendFormat": "{{service_name}} / {{rpc_method}}",
               "refId": "A"
             }
@@ -2026,7 +2026,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(rate(grpc_errors_total{service_name=~\"$service\",rpc_method=~\"$rpc_method\",error_code=\"CONFLICT\"}[5m])) by (service_name, rpc_method) / sum(rate(grpc_server_milliseconds_count{service_name=~\"$service\",rpc_method=~\"$rpc_method\"}[5m])) by (service_name, rpc_method)",
+              "expr": "sum(rate(grpc_errors_total{service_name=~\"$service\",rpc_method=~\"$rpc_method\",error_code=\"CONFLICT\"}[5m])) by (service_name, rpc_method) / sum(rate(grpc_server_seconds_count{service_name=~\"$service\",rpc_method=~\"$rpc_method\"}[5m])) by (service_name, rpc_method)",
               "legendFormat": "{{service_name}} / {{rpc_method}}",
               "refId": "A"
             }

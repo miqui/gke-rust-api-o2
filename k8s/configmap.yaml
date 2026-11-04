@@ -17,7 +17,7 @@ data:
   # Sample 10% of new traces (children follow their parent's decision) - a k6 run
   # otherwise floods OpenObserve's 5Gi PVC. Raise to 1.0 temporarily when debugging.
   TRACES_SAMPLING_PROBABILITY: "0.1"
-  # REDIS_HOST (Memorystore private IP) and REDIS_AUTH_STRING come from the redis-connection
+  # REDIS_HOST (Memorystore private IP) and REDIS_AUTH_STRING come from the redis-connection / redis-connection-auth
   # Secret Crossplane writes (see deployment.yaml and redis.yaml). Memorystore is TLS-only
   # (SERVER_AUTHENTICATION); the CA is mounted from that same Secret.
   REDIS_PORT: "6379"
