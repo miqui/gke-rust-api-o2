@@ -118,7 +118,12 @@ jobs:
         run: rustup toolchain install
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
+      # The integration/conformance tests start Postgres 16 and Redis 7 with testcontainers; the
+      # ubuntu runner ships Docker. REQUIRE_INTEGRATION=1 turns "no Docker available" into a
+      # failure instead of silently skipping the DB-backed tests.
       - name: cargo test
+        env:
+          REQUIRE_INTEGRATION: "1"
         run: cargo test --locked --all-targets
 
   audit:
