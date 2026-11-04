@@ -1,0 +1,189 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: message-service
+  labels:
+    app: message-service
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: message-service
+  template:
+    metadata:
+      labels:
+        app: message-service
+    spec:
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        # runAsUser is set explicitly as well as runAsNonRoot: 10001 is the image's numeric `app`
+        # uid/gid (see the Dockerfile), which is what lets the kubelet verify it's non-root. It is
+        # above 10000 so it can't collide with a host user (Trivy KSV-0020/KSV-0021).
+        # The container-level securityContexts below (no privilege escalation, no capabilities)
+        # are what the Kyverno policies in k8s/policies/ require; readOnlyRootFilesystem is for
+        # Trivy KSV-0014.
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: wait-for-postgres
+          image: postgres:16-alpine
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "16Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"
+          envFrom:
+            - configMapRef:
+                name: message-service-config
+            - secretRef:
+                name: postgres-credentials
+          env:
+            # Cloud SQL private IP, from the Secret Crossplane writes for the PostgresInstance
+            # (k8s/postgres.yaml). Until that exists the pod shows CreateContainerConfigError
+            # and the kubelet keeps retrying.
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: cloudsql-connection
+                  key: privateIP
+          command:
+            - sh
+            - -c
+            - |
+              # Connect to the application database itself, not just the server: Cloud SQL accepts
+              # connections (pg_isready passes) minutes before Crossplane has created the database
+              # and user, and Flyway would crash on "database does not exist" at startup.
+              export PGPASSWORD="$DB_PASSWORD" PGSSLMODE="$DB_SSLMODE" PGCONNECT_TIMEOUT=3
+              until psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -tAc 'SELECT 1' >/dev/null 2>&1; do
+                echo "Waiting for database $DB_NAME on Cloud SQL at $DB_HOST:$DB_PORT..."
+                sleep 2
+              done
+        - name: wait-for-hazelcast
+          image: busybox:1.36
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "16Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"
+          envFrom:
+            - configMapRef:
+                name: message-service-config
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z "$HAZELCAST_HOST" "$HAZELCAST_PORT"; do
+                echo "Waiting for hazelcast at $HAZELCAST_HOST:$HAZELCAST_PORT..."
+                sleep 2
+              done
+      containers:
+        - name: message-service
+          image: message-service:latest
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          # The root filesystem is read-only; /tmp (java.io.tmpdir, see the Dockerfile) is the one
+          # writable path - Netty unpacks its native transport there and Tomcat its work dir.
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          ports:
+            - containerPort: 9090
+              name: grpc
+            - containerPort: 8081
+              name: mgmt
+          envFrom:
+            - configMapRef:
+                name: message-service-config
+            - secretRef:
+                name: postgres-credentials
+          env:
+            # Cloud SQL private IP, see the wait-for-postgres init container.
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: cloudsql-connection
+                  key: privateIP
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          # JVM sizing: the heap is 75% of the limit (MaxRAMPercentage in the Dockerfile); the
+          # remaining ~190Mi covers metaspace, thread stacks and Netty's direct buffers. Requests
+          # == limits for memory so the pod is never OOM-killed for using what it was promised.
+          # The CPU limit is generous because JIT compilation at startup is CPU-bound.
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "768Mi"
+            limits:
+              cpu: "1500m"
+              memory: "768Mi"
+          # Probes hit Spring Boot Actuator on the management port (plain HTTP/1.1), not gRPC.
+          # Startup budget: 10s + 24 x 5s = 130s, for a cold JVM plus Flyway plus the Hazelcast
+          # connect timeout (20s) on a throttled node.
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: mgmt
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 24
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: mgmt
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: mgmt
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          # Shutdown: the pod leaves the Service endpoints as soon as it is Terminating, but the
+          # load balancer takes a few seconds to notice. The sleep keeps serving during that window;
+          # then SIGTERM flips readiness DOWN and the gRPC server drains in-flight calls for up
+          # to 20s (spring.grpc.server.shutdown.grace-period). 10 + 20 < 45.
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 10
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - message-service
+                topologyKey: "kubernetes.io/hostname"

@@ -1,0 +1,163 @@
+// message-service gRPC contract, v1. Two resources, Author and Message, addressed by UUID string.
+//
+// Errors are google.rpc.Status (grpc-status-details-bin trailer) carrying:
+//   - google.rpc.ErrorInfo  reason = BAD_USER_INPUT | NOT_FOUND | CONFLICT | INTERNAL_SERVER_ERROR,
+//                           domain = "message-service.miqui.dev" - the stable code to switch on
+//   - google.rpc.BadRequest one FieldViolation per invalid field (INVALID_ARGUMENT only)
+// See API-DESIGN.md for the status code of every outcome.
+// All text fields reject U+0000 (NUL) with INVALID_ARGUMENT and a field violation.
+syntax = "proto3";
+
+package message.v1;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+// Not referenced by any field: imported so server reflection also serves ErrorInfo and
+// BadRequest, letting grpcurl decode the error details instead of printing raw bytes.
+import "google/rpc/error_details.proto";
+
+option java_multiple_files = true;
+option java_package = "dev.miqui.messageservice.v1";
+option java_outer_classname = "MessageServiceProto";
+
+// ---- resources ---------------------------------------------------------------------------------
+
+message Author {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+// A message without its author (used inside GetAuthorResponse.messages).
+message MessageSummary {
+  string id = 1;
+  string title = 2;
+  string content = 3;
+  google.protobuf.Timestamp created_at = 4;
+  // Optimistic-locking version: starts at 0, +1 on every successful UpdateMessage.
+  int32 version = 5;
+}
+
+message Message {
+  string id = 1;
+  string title = 2;
+  string content = 3;
+  google.protobuf.Timestamp created_at = 4;
+  int32 version = 5;
+  Author author = 6;
+}
+
+// ---- messages ----------------------------------------------------------------------------------
+
+service MessageService {
+  // Page of messages, newest first. INVALID_ARGUMENT for out-of-range limit/offset.
+  rpc ListMessages(ListMessagesRequest) returns (ListMessagesResponse);
+  // One message with its author (cache-aside). INVALID_ARGUMENT, NOT_FOUND.
+  rpc GetMessage(GetMessageRequest) returns (Message);
+  // INVALID_ARGUMENT, NOT_FOUND (unknown author).
+  rpc CreateMessage(CreateMessageRequest) returns (Message);
+  // Applies only if the message is still at `version`. INVALID_ARGUMENT, NOT_FOUND,
+  // ABORTED (the message changed since that version was read: refetch and retry).
+  rpc UpdateMessage(UpdateMessageRequest) returns (Message);
+  // INVALID_ARGUMENT, NOT_FOUND.
+  rpc DeleteMessage(DeleteMessageRequest) returns (google.protobuf.Empty);
+}
+
+message ListMessagesRequest {
+  // 1-200, default 50 when absent.
+  optional int32 limit = 1;
+  // 0 or more, default 0.
+  optional int32 offset = 2;
+}
+
+message ListMessagesResponse {
+  repeated Message items = 1;
+  int64 total_count = 2;
+}
+
+message GetMessageRequest {
+  string id = 1;
+}
+
+message CreateMessageRequest {
+  // Trimmed, non-blank, at most 100 characters.
+  string title = 1;
+  // Trimmed, non-blank, at most 1000 characters.
+  string content = 2;
+  string author_id = 3;
+}
+
+message UpdateMessageRequest {
+  string id = 1;
+  // Absent means unchanged; present must pass the same checks as on create.
+  optional string title = 2;
+  // Always required: it is what the version guard protects.
+  string content = 3;
+  // Required: the version the caller read, 0 to 2147483647.
+  optional int32 version = 4;
+}
+
+message DeleteMessageRequest {
+  string id = 1;
+}
+
+// ---- authors -----------------------------------------------------------------------------------
+
+service AuthorService {
+  // Page of authors, oldest first. INVALID_ARGUMENT.
+  rpc ListAuthors(ListAuthorsRequest) returns (ListAuthorsResponse);
+  // One author, optionally with one page of their messages (without the author).
+  // INVALID_ARGUMENT, NOT_FOUND.
+  rpc GetAuthor(GetAuthorRequest) returns (GetAuthorResponse);
+  // INVALID_ARGUMENT, ALREADY_EXISTS (duplicate email).
+  rpc CreateAuthor(CreateAuthorRequest) returns (Author);
+  // INVALID_ARGUMENT, NOT_FOUND, ALREADY_EXISTS.
+  rpc UpdateAuthor(UpdateAuthorRequest) returns (Author);
+  // INVALID_ARGUMENT, NOT_FOUND, FAILED_PRECONDITION (the author still has messages).
+  rpc DeleteAuthor(DeleteAuthorRequest) returns (google.protobuf.Empty);
+}
+
+message ListAuthorsRequest {
+  optional int32 limit = 1;
+  optional int32 offset = 2;
+}
+
+message ListAuthorsResponse {
+  repeated Author items = 1;
+  int64 total_count = 2;
+}
+
+message GetAuthorRequest {
+  string id = 1;
+  bool include_messages = 2;
+  // 1-200, default 50 when absent. Validated even when include_messages is false.
+  optional int32 messages_limit = 3;
+  // 0 or more, default 0. Uses int64 so continuation is not limited to int32 offsets.
+  optional int64 messages_offset = 4;
+}
+
+message GetAuthorResponse {
+  Author author = 1;
+  // One page, newest first; only populated when include_messages is true.
+  repeated MessageSummary messages = 2;
+  // Present only when another page exists. Send it as messages_offset on the next request.
+  optional int64 next_messages_offset = 3;
+}
+
+message CreateAuthorRequest {
+  // Trimmed, non-blank, at most 50 characters.
+  string name = 1;
+  // Trimmed, at most 100 characters, must look like an email address.
+  string email = 2;
+}
+
+message UpdateAuthorRequest {
+  string id = 1;
+  optional string name = 2;
+  optional string email = 3;
+}
+
+message DeleteAuthorRequest {
+  string id = 1;
+}

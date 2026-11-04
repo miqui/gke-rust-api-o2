@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: message-service-config
+  labels:
+    app: message-service
+data:
+  # DB_HOST is not here: it's the Cloud SQL instance's private IP, read from the
+  # cloudsql-connection Secret Crossplane writes (see deployment.yaml and postgres.yaml).
+  DB_PORT: "5432"
+  DB_NAME: "messagedb"
+  # Cloud SQL private IP: encrypted in transit, but the server cert is for the instance, not the
+  # IP, so `require` (encrypt, don't verify the hostname) rather than `verify-full`.
+  DB_SSLMODE: "require"
+  OTEL_METRICS_URL: "http://otel-collector.observability.svc.cluster.local:4318/v1/metrics"
+  OTEL_TRACES_URL: "http://otel-collector.observability.svc.cluster.local:4318/v1/traces"
+  # Sample 10% of new traces (children follow their parent's decision) - a k6 run
+  # otherwise floods OpenObserve's 5Gi PVC. Raise to 1.0 temporarily when debugging.
+  TRACES_SAMPLING_PROBABILITY: "0.1"
+  HAZELCAST_HOST: "hazelcast"
+  HAZELCAST_PORT: "5701"
