@@ -2,10 +2,11 @@
 #
 # gke-teardown.sh — delete what gke-deploy.sh/gke-bootstrap.sh created, in dependency order:
 #   1. In-cluster: stop Argo CD reconciling, then delete the Gateway (-> Google load balancer)
-#      and the PostgresInstance (-> Crossplane deletes the Cloud SQL instance) and wait for both
+#      and the PostgresInstance/RedisInstance (-> Crossplane deletes the Cloud SQL and Memorystore
+#      instances) and wait for all
 #      to be gone - deleting the cluster first would orphan them, still billing
 #   2. GKE cluster
-#   3. Leftovers: any Cloud SQL instance this platform labelled, the load balancer's forwarding
+#   3. Leftovers: any Cloud SQL / Memorystore instance this platform labelled, the load balancer's forwarding
 #      rule on grpc-ip, network endpoint groups in the VPC, and the PVCs' persistent disks (a
 #      cluster deletion leaves both behind)
 #   4. Private Service Access peering + range, static IP, SSL policy, Cloudflare A record
@@ -35,7 +36,7 @@ VPC="${VPC:-dev-vpc}"
 SUBNET="${SUBNET:-dev-subnet}"
 ROUTER="${ROUTER:-dev-router}"
 NAT="${NAT:-dev-nat}"
-REPO="${REPO:-springboot-grpc-o2}"
+REPO="${REPO:-gke-rust-api-o2}"
 DOMAIN="${DOMAIN:-miqui.dev}"
 API_HOST="${API_HOST:-grpc.${DOMAIN}}"
 
@@ -46,10 +47,11 @@ DNS_AUTH="grpc-dns-auth"
 CERT="grpc-cert"
 CERT_MAP="grpc-cert-map"
 CERT_MAP_ENTRY="grpc-cert-map-entry"
-SERVICE_ACCOUNTS=(gke-dev-nodes crossplane-gcp external-secrets argocd-image-updater ci-springboot-grpc-o2)
+SERVICE_ACCOUNTS=(gke-dev-nodes crossplane-gcp external-secrets argocd-image-updater ci-gke-rust-api-o2)
 PROJECT_ROLES=(
   "gke-dev-nodes=roles/container.defaultNodeServiceAccount"
   "crossplane-gcp=roles/cloudsql.admin"
+  "crossplane-gcp=roles/redis.admin"
   "crossplane-gcp=roles/compute.networkUser"
 )
 SECRETS=(postgres-app-password grafana-admin-user grafana-admin-password
@@ -121,11 +123,19 @@ if gcloud container clusters describe "$CLUSTER" --zone="$ZONE" &>/dev/null; the
         || true
     fi
 
-    log "Deleting PostgresInstances (Crossplane deletes the Cloud SQL instance; ~5 min)"
+    log "Deleting PostgresInstances + RedisInstances (Crossplane deletes the Cloud SQL and Memorystore instances; ~5 min)"
     if kubectl get crd postgresinstances.platform.miqui.dev >/dev/null 2>&1; then
       kubectl delete postgresinstances --all -A --wait=false || true
       wait_until 1200 "Cloud SQL managed resources to be deleted" \
         bash -c '[[ -z "$(kubectl get databaseinstances.sql.gcp.m.upbound.io -A --no-headers 2>/dev/null)" ]]' \
+        || true
+    else
+      skip
+    fi
+    if kubectl get crd redisinstances.platform.miqui.dev >/dev/null 2>&1; then
+      kubectl delete redisinstances --all -A --wait=false || true
+      wait_until 1200 "Memorystore managed resources to be deleted" \
+        bash -c '[[ -z "$(kubectl get instances.redis.gcp.m.upbound.io -A --no-headers 2>/dev/null)" ]]' \
         || true
     else
       skip
@@ -157,13 +167,25 @@ else
 fi
 
 # ---- 3. Leftovers the in-cluster cleanup should have removed -----------------------
-log "Checking for leftover Cloud SQL instances (label platform=gke-springboot-grpc-o2)"
-LEFTOVER_SQL=$(gcloud sql instances list --filter="settings.userLabels.platform=gke-springboot-grpc-o2" \
+log "Checking for leftover Cloud SQL instances (label platform=gke-rust-api-o2)"
+LEFTOVER_SQL=$(gcloud sql instances list --filter="settings.userLabels.platform=gke-rust-api-o2" \
   --format='value(name)' 2>/dev/null || true)
 if [[ -n "$LEFTOVER_SQL" ]]; then
   for inst in $LEFTOVER_SQL; do
     echo "    deleting $inst"
     gcloud sql instances delete "$inst" --quiet
+  done
+else
+  echo "    none"
+fi
+
+log "Checking for leftover Memorystore for Redis instances (label platform=gke-rust-api-o2)"
+LEFTOVER_REDIS=$(gcloud redis instances list --region="$REGION" --filter="labels.platform=gke-rust-api-o2" \
+  --format='value(name.basename())' 2>/dev/null || true)
+if [[ -n "$LEFTOVER_REDIS" ]]; then
+  for inst in $LEFTOVER_REDIS; do
+    echo "    deleting $inst"
+    gcloud redis instances delete "$inst" --region="$REGION" --quiet
   done
 else
   echo "    none"

@@ -125,6 +125,6 @@ scrape_configs:
     static_configs:
       - targets: ['openobserve.observability.svc.cluster.local:5080']
 
-  # ... postgres-exporter, hazelcast, node-exporter, kubernetes-nodes-cadvisor jobs
+  # ... postgres-exporter, node-exporter, kubernetes-nodes-cadvisor jobs
   # pre-existed this work and are unchanged - see config/prometheus.yml for the full file.
 ```

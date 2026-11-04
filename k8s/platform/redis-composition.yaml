@@ -1,0 +1,81 @@
+# Provides a RedisInstance as a Memorystore for Redis instance. Mirrors postgres-composition.yaml.
+#
+# Instance naming: the Instance has no fixed name, so Crossplane names it
+# "<RedisInstance name>-<random suffix>" and that becomes the Memorystore instance ID - a fresh
+# suffix per cluster, so a rebuild never collides with a not-yet-purged instance of the same name.
+#
+# Dev-cluster trade-offs, deliberate:
+#   - BASIC tier by default (spec.tier), no persistence: it's a cache; gke-teardown.sh deletes the
+#     instance and its data. deletionProtection is off for the same reason.
+# Hardening kept regardless: reachable only over private service access (the VPC's peering with
+# Google services - same range as Cloud SQL), AUTH required, TLS required (SERVER_AUTHENTICATION).
+#
+# Connection details written to the Secret named by spec.connectionSecretName (provider-defined
+# keys, see config/redis in provider-upjet-gcp): host, port, server_ca_certs_0_cert and
+# attribute.auth_string.
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: redisinstance-memorystore
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  compositeTypeRef:
+    apiVersion: platform.miqui.dev/v1alpha1
+    kind: RedisInstance
+  mode: Pipeline
+  pipeline:
+    - step: memorystore
+      functionRef:
+        name: function-patch-and-transform
+      input:
+        apiVersion: pt.fn.crossplane.io/v1beta1
+        kind: Resources
+        resources:
+          - name: instance
+            base:
+              apiVersion: redis.gcp.m.upbound.io/v1beta1
+              kind: Instance
+              spec:
+                providerConfigRef:
+                  kind: ClusterProviderConfig
+                  name: default
+                forProvider:
+                  region: us-central1
+                  tier: BASIC
+                  memorySizeGb: 1
+                  redisVersion: REDIS_7_2
+                  deletionProtection: false
+                  authEnabled: true
+                  transitEncryptionMode: SERVER_AUTHENTICATION
+                  # Private service access: the instance gets an IP from the range gke-deploy.sh
+                  # allocated and peered with the VPC (the same one Cloud SQL uses).
+                  connectMode: PRIVATE_SERVICE_ACCESS
+                  authorizedNetwork: projects/k8s-dev-412419/global/networks/dev-vpc
+                  reservedIpRange: cloudsql-psa-range
+                  labels:
+                    managed-by: crossplane
+                    platform: gke-rust-api-o2
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.tier
+                toFieldPath: spec.forProvider.tier
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.memorySizeGb
+                toFieldPath: spec.forProvider.memorySizeGb
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.version
+                toFieldPath: spec.forProvider.redisVersion
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.connectionSecretName
+                toFieldPath: spec.writeConnectionSecretToRef.name
+              - type: ToCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: status.instanceName
+              - type: ToCompositeFieldPath
+                fromFieldPath: status.atProvider.host
+                toFieldPath: status.host
+
+    - step: automatically-detect-ready-composed-resources
+      functionRef:
+        name: function-auto-ready

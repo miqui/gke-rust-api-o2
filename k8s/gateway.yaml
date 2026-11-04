@@ -52,7 +52,7 @@ spec:
           port: 9090
 ---
 # The load balancer's own health check (separate from the kubelet probes): plain HTTP to the
-# Actuator readiness endpoint on the management port, since the LB can't speak grpc.health.v1.
+# /readyz on the management port, since the LB can't speak grpc.health.v1.
 # Readiness, so a pod that is draining (SIGTERM flips it DOWN) drops out of the LB too, not just
 # out of the Service.
 apiVersion: networking.gke.io/v1
@@ -72,7 +72,7 @@ spec:
       httpHealthCheck:
         portSpecification: USE_FIXED_PORT
         port: 8081
-        requestPath: /actuator/health/readiness
+        requestPath: /readyz
   targetRef:
     group: ""
     kind: Service

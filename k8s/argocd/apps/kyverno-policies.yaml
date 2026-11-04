@@ -16,7 +16,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/miqui/gke-springboot-grpc-o2.git
+    repoURL: https://github.com/miqui/gke-rust-api-o2.git
     targetRevision: main
     path: k8s/policies
   destination:

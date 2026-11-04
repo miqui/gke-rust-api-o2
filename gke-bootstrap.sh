@@ -24,7 +24,7 @@ cd "$(dirname "$0")"
 PROJECT_ID="${PROJECT_ID:?PROJECT_ID is required, e.g. PROJECT_ID=k8s-dev-412419 ./gke-bootstrap.sh}"
 ZONE="${ZONE:-us-central1-a}"
 CLUSTER="${CLUSTER:-dev-cluster}"
-GITHUB_REPO="${GITHUB_REPO:-miqui/gke-springboot-grpc-o2}"
+GITHUB_REPO="${GITHUB_REPO:-miqui/gke-rust-api-o2}"
 API_HOST="${API_HOST:-grpc.miqui.dev}"
 # Must match k8s/argocd/apps/argocd.yaml, which takes over this release after bootstrap.
 ARGOCD_CHART_VERSION="10.9.2"
@@ -97,7 +97,7 @@ log "Applying root Application (app of apps: k8s/argocd/apps/)"
 kubectl apply -f k8s/argocd/root-application.yaml
 
 # ---- 3. Wait for everything -----------------------------------------------------------
-# Cloud SQL provisioning dominates: ~10-15 min after the springboot-grpc-o2 wave starts.
+# Cloud SQL provisioning dominates (Memorystore ~5 min): ~10-15 min after the rust-api-o2 wave starts.
 log "Waiting for all Applications to be Synced + Healthy (timeout ${SYNC_TIMEOUT_MIN}m)"
 deadline=$(( $(date +%s) + SYNC_TIMEOUT_MIN * 60 ))
 while :; do
@@ -116,7 +116,7 @@ while :; do
   if [[ $(date +%s) -ge $deadline ]]; then
     echo "ERROR: timed out. Current state:" >&2
     echo "$status" >&2
-    echo "Inspect: kubectl get applications -n argocd; kubectl get postgresinstance,managed -A" >&2
+    echo "Inspect: kubectl get applications -n argocd; kubectl get postgresinstance,redisinstance,managed -A" >&2
     exit 1
   fi
   sleep 30

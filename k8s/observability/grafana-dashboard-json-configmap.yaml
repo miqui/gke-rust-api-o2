@@ -195,7 +195,7 @@ data:
     {
       "title": "message-service API",
       "uid": "message-service-api",
-      "description": "Per-API gRPC/JVM/HikariCP metrics. The Service dropdown filters every series on service_name.",
+      "description": "Per-API gRPC metrics. The Service dropdown filters every series on service_name.",
       "timezone": "browser",
       "schemaVersion": 39,
       "refresh": "10s",
@@ -277,95 +277,6 @@ data:
           }
         },
         {
-          "id": 2,
-          "title": "DB Pool Connections (open/busy/idle)",
-          "type": "stat",
-          "gridPos": {
-            "h": 4,
-            "w": 4,
-            "x": 4,
-            "y": 0
-          },
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "targets": [
-            {
-              "expr": "sum(hikaricp_connections{service_name=~\"$service\"})",
-              "refId": "A",
-              "legendFormat": "open"
-            },
-            {
-              "expr": "sum(hikaricp_connections_active{service_name=~\"$service\"})",
-              "refId": "B",
-              "legendFormat": "busy"
-            },
-            {
-              "expr": "sum(hikaricp_connections_idle{service_name=~\"$service\"})",
-              "refId": "C",
-              "legendFormat": "idle"
-            }
-          ],
-          "description": "HikariCP: open = connections in the pool (max 10 per pod), busy = checked out by a request, idle = open and waiting."
-        },
-        {
-          "id": 3,
-          "title": "Process CPU Usage (hottest pod)",
-          "type": "gauge",
-          "gridPos": {
-            "h": 4,
-            "w": 4,
-            "x": 8,
-            "y": 0
-          },
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "percentunit",
-              "min": 0,
-              "max": 1
-            }
-          },
-          "targets": [
-            {
-              "expr": "max(process_cpu_usage{service_name=~\"$service\"})",
-              "refId": "A"
-            }
-          ],
-          "description": "process_cpu_usage: share of the CPUs the JVM sees (the container limit, rounded up)."
-        },
-        {
-          "id": 4,
-          "title": "GC Pause Time Share (worst pod)",
-          "type": "stat",
-          "gridPos": {
-            "h": 4,
-            "w": 4,
-            "x": 12,
-            "y": 0
-          },
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "percentunit"
-            }
-          },
-          "targets": [
-            {
-              "expr": "max(sum by (k8s_pod_name) (rate(jvm_gc_pause_milliseconds_sum{service_name=~\"$service\"}[1m])) / 1000)",
-              "refId": "A"
-            }
-          ],
-          "description": "Share of wall-clock time the JVM spent in GC pauses over the last minute (replaces the Python event-loop lag panel). A few percent is normal; sustained >10% means the heap is too small for the load."
-        },
-        {
           "id": 5,
           "title": "Request Rate by Method",
           "type": "timeseries",
@@ -420,39 +331,6 @@ data:
           ]
         },
         {
-          "id": 7,
-          "title": "JVM Memory by Pod",
-          "type": "timeseries",
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 12
-          },
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "bytes"
-            }
-          },
-          "targets": [
-            {
-              "expr": "sum by (k8s_pod_name) (jvm_memory_used_bytes{service_name=~\"$service\",area=\"heap\"})",
-              "refId": "A",
-              "legendFormat": "heap {{k8s_pod_name}}"
-            },
-            {
-              "expr": "sum by (k8s_pod_name) (jvm_memory_used_bytes{service_name=~\"$service\",area=\"nonheap\"})",
-              "refId": "B",
-              "legendFormat": "non-heap {{k8s_pod_name}}"
-            }
-          ],
-          "description": "Heap and non-heap (metaspace, code cache) in use. The heap ceiling is 75% of the container memory limit (-XX:MaxRAMPercentage); see API RED & Saturation for the container working set against its limit."
-        },
-        {
           "id": 8,
           "title": "Error Rate by Method",
           "description": "grpc_errors_total is only created on the first error, so this panel is empty (not zero) until a request returns an error status.",
@@ -482,6 +360,7 @@ data:
         }
       ]
     }
+
   cluster-ops.json: |
     {
       "title": "Cluster ops",
@@ -847,165 +726,6 @@ data:
         }
       ]
     }
-  hazelcast-cache.json: |
-    {
-      "title": "Hazelcast Cache",
-      "uid": "hazelcast-cache",
-      "timezone": "browser",
-      "schemaVersion": 39,
-      "refresh": "10s",
-      "time": { "from": "now-30m", "to": "now" },
-      "panels": [
-        {
-          "id": 1,
-          "title": "Cluster Size (members)",
-          "type": "stat",
-          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "targets": [
-            { "expr": "com_hazelcast_metrics_size{prefix=\"cluster\"}", "refId": "A" }
-          ]
-        },
-        {
-          "id": 2,
-          "title": "Connected Clients",
-          "type": "stat",
-          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "targets": [
-            { "expr": "com_hazelcast_metrics_count{prefix=\"client.endpoint\"}", "refId": "A" }
-          ]
-        },
-        {
-          "id": 3,
-          "title": "\"messages\" Map Cache Hit Ratio",
-          "type": "gauge",
-          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "fieldConfig": {
-            "defaults": { "unit": "percentunit", "min": 0, "max": 1 }
-          },
-          "targets": [
-            {
-              "expr": "com_hazelcast_metrics_hits{tag0=~\".*name=messages.*\"} / com_hazelcast_metrics_getcount{tag0=~\".*name=messages.*\"}",
-              "refId": "A"
-            }
-          ]
-        },
-        {
-          "id": 4,
-          "title": "\"messages\" Map Cached Entries",
-          "type": "stat",
-          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "targets": [
-            { "expr": "com_hazelcast_metrics_ownedentrycount{tag0=~\".*name=messages.*\"}", "refId": "A" }
-          ]
-        },
-        {
-          "id": 5,
-          "title": "\"messages\" Map Operation Rate",
-          "type": "timeseries",
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "fieldConfig": { "defaults": { "unit": "ops" } },
-          "targets": [
-            { "expr": "rate(com_hazelcast_metrics_hits{tag0=~\".*name=messages.*\"}[5m])", "legendFormat": "hits", "refId": "A" },
-            { "expr": "rate(com_hazelcast_metrics_getcount{tag0=~\".*name=messages.*\"}[5m])", "legendFormat": "gets", "refId": "B" },
-            { "expr": "rate(com_hazelcast_metrics_putcount{tag0=~\".*name=messages.*\"}[5m])", "legendFormat": "puts", "refId": "C" },
-            { "expr": "rate(com_hazelcast_metrics_removecount{tag0=~\".*name=messages.*\"}[5m])", "legendFormat": "removes", "refId": "D" }
-          ]
-        },
-        {
-          "id": 6,
-          "title": "\"messages\" Map Average Latency (get vs put)",
-          "type": "timeseries",
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "fieldConfig": { "defaults": { "unit": "ms" } },
-          "targets": [
-            {
-              "expr": "rate(com_hazelcast_metrics_totalgetlatency{tag0=~\".*name=messages.*\"}[5m]) / rate(com_hazelcast_metrics_getcount{tag0=~\".*name=messages.*\"}[5m])",
-              "legendFormat": "get",
-              "refId": "A"
-            },
-            {
-              "expr": "rate(com_hazelcast_metrics_totalputlatency{tag0=~\".*name=messages.*\"}[5m]) / rate(com_hazelcast_metrics_putcount{tag0=~\".*name=messages.*\"}[5m])",
-              "legendFormat": "put",
-              "refId": "B"
-            }
-          ]
-        },
-        {
-          "id": 7,
-          "title": "Member Heap Memory",
-          "type": "timeseries",
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "fieldConfig": { "defaults": { "unit": "bytes" } },
-          "targets": [
-            { "expr": "com_hazelcast_metrics_usedheap{prefix=\"memory\"}", "legendFormat": "used", "refId": "A" },
-            { "expr": "com_hazelcast_metrics_committedheap{prefix=\"memory\"}", "legendFormat": "committed", "refId": "B" },
-            { "expr": "com_hazelcast_metrics_maxheap{prefix=\"memory\"}", "legendFormat": "max", "refId": "C" }
-          ]
-        },
-        {
-          "id": 8,
-          "title": "GC Minor Collection Time (rate)",
-          "type": "timeseries",
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "fieldConfig": { "defaults": { "unit": "ms" } },
-          "targets": [
-            { "expr": "rate(com_hazelcast_metrics_minortime{prefix=\"gc\"}[5m])", "refId": "A" }
-          ]
-        },
-        {
-          "id": 9,
-          "title": "TCP Connections",
-          "type": "timeseries",
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "targets": [
-            { "expr": "com_hazelcast_metrics_activecount{prefix=\"tcp.connection\"}", "legendFormat": "active", "refId": "A" },
-            { "expr": "com_hazelcast_metrics_clientcount{prefix=\"tcp.connection\"}", "legendFormat": "client", "refId": "B" }
-          ]
-        },
-        {
-          "id": 10,
-          "title": "\"messages\" Map Evictions & Expirations Rate",
-          "type": "timeseries",
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "fieldConfig": { "defaults": { "unit": "ops" } },
-          "targets": [
-            { "expr": "rate(com_hazelcast_metrics_evictioncount{tag0=~\".*name=messages.*\"}[5m])", "legendFormat": "evictions", "refId": "A" },
-            { "expr": "rate(com_hazelcast_metrics_expirationcount{tag0=~\".*name=messages.*\"}[5m])", "legendFormat": "expirations", "refId": "B" }
-          ]
-        },
-        {
-          "id": 11,
-          "title": "\"messages\" Map Owned Entry Memory Cost",
-          "type": "timeseries",
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "fieldConfig": { "defaults": { "unit": "bytes" } },
-          "targets": [
-            { "expr": "com_hazelcast_metrics_ownedentrymemorycost{tag0=~\".*name=messages.*\"}", "refId": "A" }
-          ]
-        },
-        {
-          "id": 12,
-          "title": "\"messages\" Map Backup Entry Count",
-          "type": "timeseries",
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "targets": [
-            { "expr": "com_hazelcast_metrics_backupentrycount{tag0=~\".*name=messages.*\"}", "refId": "A" }
-          ]
-        }
-      ]
-    }
   api-red.json: |
     {
       "title": "API RED & Saturation",
@@ -1145,27 +865,6 @@ data:
           "targets": [
             {
               "expr": "(sum(rate(grpc_errors_total{service_name=~\"$service\"}[5m])) or vector(0)) / sum(rate(grpc_server_milliseconds_count{service_name=~\"$service\"}[5m]))",
-              "refId": "A"
-            }
-          ]
-        },
-        {
-          "id": 4,
-          "title": "DB Pool Busy Connections",
-          "type": "stat",
-          "gridPos": {
-            "h": 4,
-            "w": 4,
-            "x": 12,
-            "y": 0
-          },
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "targets": [
-            {
-              "expr": "sum(hikaricp_connections_active{service_name=~\"$service\"})",
               "refId": "A"
             }
           ]
@@ -1327,77 +1026,6 @@ data:
           ]
         },
         {
-          "id": 10,
-          "title": "DB Connection Pool Utilization",
-          "type": "timeseries",
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 12,
-            "y": 20
-          },
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "targets": [
-            {
-              "expr": "sum(hikaricp_connections_active{service_name=~\"$service\"}) by (service_name)",
-              "refId": "A",
-              "legendFormat": "busy {{service_name}}"
-            },
-            {
-              "expr": "sum(hikaricp_connections_idle{service_name=~\"$service\"}) by (service_name)",
-              "refId": "B",
-              "legendFormat": "idle {{service_name}}"
-            },
-            {
-              "expr": "sum(hikaricp_connections_max{service_name=~\"$service\"}) by (service_name)",
-              "refId": "C",
-              "legendFormat": "max (capacity) {{service_name}}"
-            },
-            {
-              "expr": "sum(hikaricp_connections_pending{service_name=~\"$service\"}) by (service_name)",
-              "refId": "D",
-              "legendFormat": "pending {{service_name}}"
-            }
-          ],
-          "description": "HikariCP per service. Pending > 0 means requests are waiting for a connection: the pool (10 per pod) is the bottleneck."
-        },
-        {
-          "id": 11,
-          "title": "DB Query Time (avg)",
-          "type": "timeseries",
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 28
-          },
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "ms"
-            }
-          },
-          "targets": [
-            {
-              "expr": "sum(rate(jdbc_query_milliseconds_sum{service_name=~\"$service\"}[5m])) by (service_name) / sum(rate(jdbc_query_milliseconds_count{service_name=~\"$service\"}[5m])) by (service_name)",
-              "refId": "A",
-              "legendFormat": "query (avg) {{service_name}}"
-            },
-            {
-              "expr": "sum(rate(hikaricp_connections_acquire_milliseconds_sum{service_name=~\"$service\"}[5m])) by (service_name) / sum(rate(hikaricp_connections_acquire_milliseconds_count{service_name=~\"$service\"}[5m])) by (service_name)",
-              "refId": "B",
-              "legendFormat": "connection acquire (avg) {{service_name}}"
-            }
-          ],
-          "description": "Per JDBC statement (datasource-micrometer), and the time a request waits to get a pool connection."
-        },
-        {
           "id": 12,
           "title": "CPU Throttling Ratio",
           "type": "timeseries",
@@ -1486,6 +1114,7 @@ data:
         }
       ]
     }
+
   grpc-operations.json: |
     {
       "title": "gRPC Operations",

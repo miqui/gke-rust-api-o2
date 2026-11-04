@@ -65,7 +65,7 @@ spec:
                         value: all
                     userLabels:
                       managed-by: crossplane
-                      platform: gke-springboot-grpc-o2
+                      platform: gke-rust-api-o2
             patches:
               - type: FromCompositeFieldPath
                 fromFieldPath: spec.version

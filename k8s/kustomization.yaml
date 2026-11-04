@@ -7,9 +7,7 @@ resources:
   - external-secret.yaml
   - configmap.yaml
   - postgres.yaml
-  - hazelcast-jmx-exporter-configmap.yaml
-  - hazelcast-deployment.yaml
-  - hazelcast-service.yaml
+  - redis.yaml
   - deployment.yaml
   - hpa.yaml
   - service.yaml
@@ -17,5 +15,5 @@ resources:
 
 images:
   - name: message-service
-    newName: us-central1-docker.pkg.dev/k8s-dev-412419/springboot-grpc-o2/grpc-message-api
+    newName: us-central1-docker.pkg.dev/k8s-dev-412419/gke-rust-api-o2/gke-rust-api-o2
     newTag: latest

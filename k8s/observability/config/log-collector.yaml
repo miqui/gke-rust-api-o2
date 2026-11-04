@@ -1,6 +1,6 @@
 receivers:
   filelog:
-    # Only the `default` namespace (message-service, postgres, hazelcast).
+    # Only the `default` namespace (message-service, postgres-exporter).
     # Widening this to every pod (argocd, kube-system, crossplane-system, ...) is a real risk
     # for OpenObserve's 5Gi PVC and its single-node MemTable - see PROMETHEUS.md step 1.
     include: [/var/log/pods/default_*/*/*.log]

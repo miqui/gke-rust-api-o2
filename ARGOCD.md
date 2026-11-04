@@ -21,14 +21,14 @@ Everything is an Application, created by the `root` Application (app of apps) fr
 | `external-secrets` | -4 | External Secrets Operator (chart + `k8s/external-secrets/values.yaml`) |
 | `crossplane` | -4 | Crossplane core (chart + `k8s/crossplane/values.yaml`) |
 | `kyverno` | -3 | Kyverno (chart + `k8s/kyverno/kyverno-values.yaml`) |
-| `platform` | -3 | `k8s/platform/`: ClusterSecretStore, Crossplane GCP SQL provider/functions/ClusterProviderConfig, `PostgresInstance` XRD + Composition |
+| `platform` | -3 | `k8s/platform/`: ClusterSecretStore, Crossplane GCP SQL + Redis providers/functions/ClusterProviderConfig, `PostgresInstance` and `RedisInstance` XRDs + Compositions |
 | `kyverno-policies` | -2 | `k8s/policies/` |
 | `observability` | -1 | `k8s/observability/` (OTel Collector, Prometheus, Grafana + dashboards, kube-state-metrics, node-exporter, log collector, ExternalSecrets, NetworkPolicies, the namespace) |
 | `headlamp` | -1 | chart + `k8s/headlamp/headlamp-values.yaml` + `k8s/headlamp/manifests/` |
 | `trivy-operator` | -1 | chart + `k8s/trivy-operator/trivy-operator-values.yaml` - see [TRIVY.md](TRIVY.md) |
 | `argocd-image-updater` | -1 | chart + `k8s/argocd/image-updater-values.yaml` + the `ImageUpdater` CR in `k8s/argocd/image-updater/` |
 | `openobserve` | 0 | chart + `k8s/observability/openobserve-values.yaml` |
-| `fastapi-o2` | 1 | `k8s/`: `PostgresInstance`, message-service, Hazelcast, postgres-exporter, Gateway, NetworkPolicies, quota |
+| `rust-api-o2` | 1 | `k8s/`: `PostgresInstance`, `RedisInstance`, message-service, postgres-exporter, Gateway, NetworkPolicies, quota |
 
 All track `main` with `automated: {prune: true, selfHeal: true}` (except `argocd`: no prune). UI:
 `./gke-port-forward.sh argocd` -> `https://localhost:8081`.
@@ -44,21 +44,21 @@ health check (without it sync waves wouldn't wait for a child to be Healthy), Cr
 kubectl get applications -n argocd                                                       # ✅ sync + health at a glance
 
 # one Application: sync status, health, deployed commit, last operation
-kubectl get application fastapi-o2 -n argocd \
+kubectl get application rust-api-o2 -n argocd \
   -o jsonpath='{.status.sync.status} {.status.health.status} rev={.status.sync.revision} {.status.operationState.phase}{"\n"}'   # ✅
 
 # per-resource status (spot the OutOfSync / Degraded one)
-kubectl get application fastapi-o2 -n argocd \
+kubectl get application rust-api-o2 -n argocd \
   -o jsonpath='{range .status.resources[*]}{.kind}/{.name} {.status} {.health.status}{"\n"}{end}'                              # ✅
 
 # errors (ComparisonError, SyncError, ...) - empty output means none
-kubectl get application fastapi-o2 -n argocd -o jsonpath='{.status.conditions}{"\n"}'                          # ✅
+kubectl get application rust-api-o2 -n argocd -o jsonpath='{.status.conditions}{"\n"}'                          # ✅
 
 # last deployments: id, commit, time
-kubectl get application fastapi-o2 -n argocd \
+kubectl get application rust-api-o2 -n argocd \
   -o jsonpath='{range .status.history[-3:]}{.id} {.revision} {.deployedAt}{"\n"}{end}'                                        # ✅
 
-kubectl describe application fastapi-o2 -n argocd                          # everything above plus events
+kubectl describe application rust-api-o2 -n argocd                          # everything above plus events
 ```
 
 Compare the deployed commit with `main`: `git rev-parse origin/main` vs `.status.sync.revision`. A
@@ -80,7 +80,7 @@ kubectl annotate application kyverno-policies -n argocd argocd.argoproj.io/refre
 kubectl annotate application kyverno-policies -n argocd argocd.argoproj.io/refresh=hard --overwrite
 
 # Trigger a sync operation (what the UI's "Sync" button does)
-kubectl patch application fastapi-o2 -n argocd --type merge \
+kubectl patch application rust-api-o2 -n argocd --type merge \
   -p '{"operation":{"sync":{"prune":true}}}'
 ```
 
@@ -89,15 +89,15 @@ syncs by itself.
 
 ## Image Updater
 
-CI pushes `us-central1-docker.pkg.dev/k8s-dev-412419/springboot-grpc-o2/grpc-message-api:<yyyymmddHHMMSS>-<sha7>`;
+CI pushes `us-central1-docker.pkg.dev/k8s-dev-412419/gke-rust-api-o2/gke-rust-api-o2:<yyyymmddHHMMSS>-<sha7>`;
 Image Updater picks the newest tag (`alphabetical` strategy) roughly every 2 minutes and writes it
 into the Application — **no git commit is made**. It reads Artifact Registry with a short-lived
 token from the GKE metadata server (Workload Identity, `argocd-image-updater` GSA, read-only); the
-root Application ignores `/spec/source/kustomize` on `fastapi-o2` so it doesn't revert the update.
+root Application ignores `/spec/source/kustomize` on `rust-api-o2` so it doesn't revert the update.
 
 ```bash
 # the tag each service is currently pinned to (the override lives on the Application, not in git)
-kubectl get application fastapi-o2 -n argocd \
+kubectl get application rust-api-o2 -n argocd \
   -o jsonpath='{.spec.source.kustomize.images}{"\n"}'                                     # ✅
 
 kubectl get imageupdater -n argocd                                                        # ✅ READY, LAST CHECKED
@@ -124,11 +124,11 @@ auto-sync first — and remember to restore it.
 
 ```bash
 # pause: remove the automated block (manual sync still works)
-kubectl patch application fastapi-o2 -n argocd --type json \
+kubectl patch application rust-api-o2 -n argocd --type json \
   -p '[{"op":"remove","path":"/spec/syncPolicy/automated"}]'
 
 # restore
-kubectl patch application fastapi-o2 -n argocd --type merge \
+kubectl patch application rust-api-o2 -n argocd --type merge \
   -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}'
 ```
 
@@ -139,7 +139,7 @@ While paused, `kubectl get application …` will show `OutOfSync` for anything y
 **Secrets don't drift.** Git holds `ExternalSecret`s, not Secrets; External Secrets owns the actual
 Secrets (built from GCP Secret Manager), so there's no placeholder for a sync to write back.
 
-**The image tag** on `fastapi-o2` differs from git on purpose (Image Updater's override); the root
+**The image tag** on `rust-api-o2` differs from git on purpose (Image Updater's override); the root
 Application ignores that field.
 
 **Hash-suffixed ConfigMaps.** `prometheus-config-<hash>`, `otel-collector-config-<hash>` and
@@ -197,7 +197,7 @@ delay, or a `ComparisonError` above)? Is the file actually referenced - listed i
 does the Image Updater log show `images_updated=1`?
 
 **A wave is stuck.** `kubectl get applications -n argocd`: the root Application only starts wave N+1
-once every wave-N Application is Healthy. `fastapi-o2` staying Progressing for ~15 minutes on a fresh
+once every wave-N Application is Healthy. `rust-api-o2` staying Progressing for ~15 minutes on a fresh
 cluster is Cloud SQL being created (`kubectl get postgresinstance,managed`).
 
 **Stuck `Progressing` / `Degraded`.** Find the resource with the per-resource query above, then
@@ -224,9 +224,9 @@ Not installed here, and none of the commands below were run. With the port-forwa
 argocd login localhost:8081 --insecure --grpc-web --username admin   # --insecure: self-signed cert
 
 argocd app list
-argocd app get fastapi-o2
-argocd app diff fastapi-o2          # live vs git
-argocd app sync fastapi-o2
-argocd app history fastapi-o2
-argocd app set fastapi-o2 --sync-policy none      # pause auto-sync
+argocd app get rust-api-o2
+argocd app diff rust-api-o2          # live vs git
+argocd app sync rust-api-o2
+argocd app history rust-api-o2
+argocd app set rust-api-o2 --sync-policy none      # pause auto-sync
 ```

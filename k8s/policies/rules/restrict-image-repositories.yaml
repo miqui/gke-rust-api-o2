@@ -30,12 +30,11 @@ spec:
     - name: allowed
       expression: >-
         [
-          'us-central1-docker.pkg.dev/k8s-dev-412419/springboot-grpc-o2/grpc-message-api',
+          'us-central1-docker.pkg.dev/k8s-dev-412419/gke-rust-api-o2/gke-rust-api-o2',
           'docker.io/library/postgres',
           'docker.io/library/busybox',
           'docker.io/library/nginx',
           'docker.io/curlimages/curl',
-          'docker.io/hazelcast/hazelcast',
           'quay.io/prometheuscommunity/postgres-exporter',
           'docker.io/grafana/grafana',
           'docker.io/prom/prometheus',

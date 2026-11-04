@@ -1,0 +1,15 @@
+# The message-service's cache, requested through the platform's RedisInstance API
+# (k8s/platform/redis-xrd.yaml). The Composition provides it as a private-IP-only Memorystore for
+# Redis instance (AUTH + TLS) and writes the connection details (host, port, server CA, AUTH
+# string) to the redis-connection Secret. First provisioning takes ~3-5 minutes;
+# `kubectl get redisinstance` shows progress.
+apiVersion: platform.miqui.dev/v1alpha1
+kind: RedisInstance
+metadata:
+  name: messagecache
+  labels:
+    app: redis
+spec:
+  tier: BASIC
+  memorySizeGb: 1
+  connectionSecretName: redis-connection

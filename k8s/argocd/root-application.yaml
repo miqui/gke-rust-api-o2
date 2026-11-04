@@ -11,7 +11,7 @@
 #   -2  kyverno-policies                                          enforce rules in place before workloads
 #   -1  observability, headlamp, polaris, trivy-operator, argocd-image-updater
 #    0  openobserve                                               needs observability's ExternalSecret
-#    1  springboot-grpc-o2                                                Cloud SQL (XR), app, Gateway
+#    1  rust-api-o2                                                Cloud SQL + Redis (XRs), app, Gateway
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -20,7 +20,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/miqui/gke-springboot-grpc-o2.git
+    repoURL: https://github.com/miqui/gke-rust-api-o2.git
     targetRevision: main
     path: k8s/argocd/apps
   destination:
@@ -32,12 +32,12 @@ spec:
       selfHeal: true
     syncOptions:
       - RespectIgnoreDifferences=true
-  # Argo CD Image Updater writes the chosen image tag into the springboot-grpc-o2 Application itself
+  # Argo CD Image Updater writes the chosen image tag into the rust-api-o2 Application itself
   # ("argocd" write-back: no git commits). Without this, the root app's selfHeal would put the
   # Application back to what's in git and undo every image update.
   ignoreDifferences:
     - group: argoproj.io
       kind: Application
-      name: springboot-grpc-o2
+      name: rust-api-o2
       jsonPointers:
         - /spec/source/kustomize
