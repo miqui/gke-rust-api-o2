@@ -1,113 +1,166 @@
-name: message-service CI
+name: rust CI
 
+# Quality checks run on EVERY pull request (so required status checks never stay pending);
+# expensive jobs are skipped via path filtering, and a skipped job counts as passing for branch
+# protection. Image publishing happens only on main.
 on:
   push:
     branches: [main]
-    paths:
-      - "src/**"
-      - "pom.xml"
-      - "mvnw"
-      - ".mvn/**"
-      - "quality/**"
-      - "scripts/quality-summary.py"
-      - "scripts/test_quality_summary.py"
-      - "Dockerfile"
-      - ".dockerignore"
-      - ".github/workflows/message-service-ci.yml"
-  pull_request:
-    branches: [main]
+  pull_request: {}
   workflow_dispatch: {}
 
-# Image: us-central1-docker.pkg.dev/<project>/springboot-grpc-o2/grpc-message-api (Artifact Registry).
-# Pushing authenticates keylessly: GitHub's OIDC token is exchanged through Workload Identity
-# Federation for a short-lived token of the ci-springboot-grpc-o2 service account, which can only write to
-# that one repository. The federation provider only accepts tokens for this repo's main branch,
-# so pull requests (which never push) can't obtain it either. Set up by gke-deploy.sh, which
-# prints the two repository variables below.
+# Image: us-central1-docker.pkg.dev/<project>/gke-rust-api-o2/gke-rust-api-o2 (Artifact Registry;
+# repository name matches REPO in gke-deploy.sh).
+# Pushing is keyless: GitHub's OIDC token is exchanged through Workload Identity Federation for a
+# short-lived token of the CI service account (vars GCP_WIF_PROVIDER / GCP_CI_SA, printed by
+# gke-deploy.sh). The provider only accepts this repo's main branch, so PRs can never push.
+# No LLM or other API secrets are used anywhere.
 env:
   REGISTRY: us-central1-docker.pkg.dev
-  IMAGE: us-central1-docker.pkg.dev/k8s-dev-412419/springboot-grpc-o2/grpc-message-api
+  IMAGE: us-central1-docker.pkg.dev/k8s-dev-412419/gke-rust-api-o2/gke-rust-api-o2
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+permissions:
+  contents: read
 
 jobs:
-  quality-gates:
-    name: API quality gates
+  changes:
+    name: Detect changes
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: read
     outputs:
-      image: ${{ github.event_name == 'workflow_dispatch' || steps.changes.outputs.image == 'true' }}
+      rust: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.rust == 'true' }}
+      image: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.image == 'true' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Keep the required check on every PR; filter its expensive steps instead of the workflow.
-      # PRs compare against their base; pushes compare against the commit before the whole push.
-      - name: Detect relevant changes
-        id: changes
+      - name: Filter paths
+        id: filter
         if: github.event_name != 'workflow_dispatch'
         uses: dorny/paths-filter@v3
         with:
           base: main
           filters: |
-            quality:
+            rust:
               - "src/**"
-              - "pom.xml"
-              - "mvnw"
-              - ".mvn/**"
-              - "quality/**"
-              - "scripts/quality-summary.py"
-              - "scripts/test_quality_summary.py"
+              - "proto/**"
+              - "third_party/**"
+              - "migrations/**"
+              - "tests/**"
+              - "build.rs"
+              - "Cargo.toml"
+              - "Cargo.lock"
+              - "rust-toolchain.toml"
+              - "clippy.toml"
+              - "rustfmt.toml"
+              - ".cargo/**"
               - "Dockerfile"
               - ".dockerignore"
-              - ".github/workflows/message-service-ci.yml"
+              - ".github/workflows/rust-ci.yml"
             image:
-              - "src/main/**"
-              - "pom.xml"
-              - "mvnw"
-              - ".mvn/**"
+              - "src/**"
+              - "proto/**"
+              - "third_party/**"
+              - "migrations/**"
+              - "build.rs"
+              - "Cargo.toml"
+              - "Cargo.lock"
+              - "rust-toolchain.toml"
               - "Dockerfile"
               - ".dockerignore"
+              - ".github/workflows/rust-ci.yml"
 
-      - name: Skip unrelated changes
-        if: github.event_name != 'workflow_dispatch' && steps.changes.outputs.quality == 'false'
-        run: echo "API quality gates skipped - no API, build, or quality inputs changed." >> "$GITHUB_STEP_SUMMARY"
+  fmt:
+    name: Rust fmt
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install pinned toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - name: cargo fmt --check
+        run: cargo fmt --all --check
 
-      - name: Set up Java 21
-        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.quality == 'true'
-        uses: actions/setup-java@v4
+  clippy:
+    name: Rust clippy
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends protobuf-compiler
+      - name: Install pinned toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+      - name: cargo clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+  test:
+    name: Rust test
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends protobuf-compiler
+      - name: Install pinned toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+      - name: cargo test
+        run: cargo test --locked --all-targets
+
+  audit:
+    name: Rust audit (non-blocking)
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@v2
         with:
-          distribution: temurin
-          java-version: "21"
-          cache: maven
+          tool: cargo-audit
+      - name: cargo audit
+        run: cargo audit
 
-      - name: Test quality summary
-        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.quality == 'true'
-        run: python3 -m unittest discover -s scripts -p 'test_quality_summary.py'
-
-      # Reports always start from a clean build.
-      - name: Verify tests and API quality
-        id: verify
-        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.quality == 'true'
-        run: ./mvnw -B -ntp clean verify
-
-      - name: Summarize API quality
-        if: always() && (steps.verify.outcome == 'success' || steps.verify.outcome == 'failure')
-        env:
-          VERIFY_OUTCOME: ${{ steps.verify.outcome }}
-        run: python3 scripts/quality-summary.py >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload test reports
-        if: failure() && steps.verify.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+  docker-build:
+    name: Docker build (no push)
+    needs: changes
+    if: needs.changes.outputs.image == 'true' && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build image
+        uses: docker/build-push-action@v6
         with:
-          name: surefire-reports
-          path: target/surefire-reports/
-          retention-days: 7
+          context: .
+          file: ./Dockerfile
+          push: false
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   build-and-push:
-    needs: quality-gates
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && needs.quality-gates.outputs.image == 'true'
+    name: Build and push image
+    needs: [changes, fmt, clippy, test]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && needs.changes.outputs.image == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
