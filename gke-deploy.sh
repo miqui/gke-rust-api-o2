@@ -39,7 +39,7 @@ VPC="${VPC:-dev-vpc}"
 SUBNET="${SUBNET:-dev-subnet}"
 ROUTER="${ROUTER:-dev-router}"
 NAT="${NAT:-dev-nat}"
-REPO="${REPO:-springboot-grpc-o2}"   # one Artifact Registry repo per project
+REPO="${REPO:-gke-rust-api-o2}"   # one Artifact Registry repo per project
 MACHINE_TYPE="${MACHINE_TYPE:-e2-standard-2}"
 MIN_NODES="${MIN_NODES:-3}"
 MAX_NODES="${MAX_NODES:-5}"
@@ -48,7 +48,7 @@ MAX_NODES="${MAX_NODES:-5}"
 NODE_DISK_SIZE_GB="${NODE_DISK_SIZE_GB:-30}"
 DOMAIN="${DOMAIN:-miqui.dev}"
 API_HOST="${API_HOST:-grpc.${DOMAIN}}"
-GITHUB_REPO="${GITHUB_REPO:-miqui/gke-springboot-grpc-o2}"
+GITHUB_REPO="${GITHUB_REPO:-miqui/gke-rust-api-o2}"
 
 SUBNET_RANGE="10.0.0.0/20"
 PODS_RANGE="10.4.0.0/14"
