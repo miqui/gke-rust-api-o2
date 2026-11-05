@@ -1,7 +1,7 @@
 # Database Debug Queries
 
 Sample SQL for poking at the database directly — useful when an API response looks wrong and you
-want to check what's actually in Postgres, bypassing the API (and the Hazelcast cache) entirely.
+want to check what's actually in Postgres, bypassing the API (and the Redis cache) entirely.
 `messagedb` belongs to message-service and lives on a Cloud SQL for PostgreSQL instance provisioned
 by Crossplane (see [README.md](README.md#architecture)).
 

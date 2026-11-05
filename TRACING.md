@@ -14,41 +14,23 @@ message-service ──► otel-collector:4318 ───────────�
 
 | Layer | Instrumentation | Spans |
 | :--- | :--- | :--- |
-| HTTP server | `opentelemetry-instrumentation-fastapi` | One server span per request, named `<METHOD> <route template>` (e.g. `PATCH /messages/{id}`) with `http.status_code`. `/health/liveness` and `/health/readiness` (kubelet probes) are excluded. W3C `traceparent` is propagated. |
-| Database | `opentelemetry-instrumentation-sqlalchemy` (on the async engine's sync engine) | One span per SQL statement (`SELECT`, `INSERT`, `UPDATE`, `DELETE`, with `db.statement`), plus a `connect` span per connection checkout from the pool. |
-| Cache | manual spans in `app/cache.py` | `hazelcast.get` / `hazelcast.set` / `hazelcast.delete`, each with `db.system=hazelcast`, `db.operation` and `cache.map`; `get` also sets `cache.hit` (true/false). |
+| gRPC server | `tracing` span in `src/grpc.rs`, exported by `tracing-opentelemetry` | One server span per RPC, named `<service>/<method>` (e.g. `message.v1.MessageService/GetMessage`) with `rpc.system`, `rpc.service`, `rpc.method`; the parent context is taken from the incoming `traceparent` metadata. |
+| Database / cache | none | sqlx and the Redis client are not span-instrumented; DB and cache latency show up as the RPC span's duration and in the `message_cache_seconds` metric. |
 
-The Hazelcast client has no OpenTelemetry instrumentation, hence the hand-written `_traced()` wrapper
-in `app/cache.py`. It matters for `GET /messages/{id}`, a cache-aside read: on a hit the trace has no
-SQL spans at all, and without a `hazelcast.get` span the hop to the (separate) Hazelcast pod is an
-unexplained gap inside the request span.
-
-A `connect` span is the instrumentor wrapping `Engine.connect()`, i.e. checking a connection out of
-the pool - it is not a new TCP connection to Postgres, and lasts a fraction of a millisecond.
-
-The service calls nothing else over HTTP, so there is no cross-service trace.
+`GetMessage` is cache-aside, so a hit is simply a faster RPC span. The log line for the same request carries the span's
+`trace_id` field, which is how to jump from a log line to its trace. The management port (`/livez`, `/readyz`, `/metrics`)
+is not traced. The service calls nothing else over HTTP, so there is no cross-service trace.
 
 ## Code
 
-`app/tracing.py`, called from `create_app()` in `app/main.py`. Decisions worth knowing before
-changing it:
+`src/telemetry.rs` (provider, sampler, exporter) and `src/grpc.rs` (the per-RPC span). Decisions worth knowing:
 
-- **It runs at app creation, not in the lifespan.** `FastAPIInstrumentor.instrument_app()` adds
-  middleware, which Starlette refuses once the app has started.
-- **`exclude_spans=["receive", "send"]`.** Without it every request gets `http send` / `http receive`
-  child spans, which multiply the span count without adding information.
-- **The instrumentors get a no-op `MeterProvider`.** Left alone they publish their own
-  `http_server_*` and `db_client_connections_*` metrics through the global provider, duplicating the
-  ones in `app/telemetry.py` - labelled with the pod IP and the client-controlled `Host` header
-  (`http_host`, `http_server_name`), which would let a caller mint Prometheus series at will. Spans
-  are unaffected.
-- **Resource attributes** mirror the metrics: `service.name` and `k8s.pod.name` (from the
-  `POD_NAME` Downward API env var).
-- **The exporter URL is used verbatim.** `OTEL_TRACES_URL` must include `/v1/traces`; the exporter
-  does not append it when an endpoint is passed explicitly.
-- **Bounded shutdown.** The exporter timeout is 5s, and `shutdown_tracing()` runs in the lifespan
-  shutdown so the last batch of spans is flushed - without letting an unreachable collector hold the
-  pod past `terminationGracePeriodSeconds`.
+- **Sampler**: `parentbased_traceidratio` using `TRACES_SAMPLING_PROBABILITY` (0..=1); children follow the parent.
+- **Resource attributes**: `service.name=message-service` and `k8s.pod.name` (from the `POD_NAME` Downward API env var).
+- **The exporter URL is used verbatim.** `OTEL_TRACES_URL` must include `/v1/traces`.
+- **Bounded shutdown.** The guard returned by `telemetry::init` flushes the last batch on drop without letting an
+  unreachable collector hold the pod past `terminationGracePeriodSeconds`.
+- `OTEL_EXPORT_ENABLED=false` turns span export off entirely (local runs, tests).
 
 ## Configuration
 
@@ -57,11 +39,9 @@ changing it:
 | Variable | Value | Purpose |
 | :--- | :--- | :--- |
 | `OTEL_TRACES_URL` | `http://otel-collector.observability.svc.cluster.local:4318/v1/traces` | Where the SDK posts spans |
-| `OTEL_TRACES_SAMPLER` | `parentbased_traceidratio` | Sample by ratio; children follow the parent's decision |
-| `OTEL_TRACES_SAMPLER_ARG` | `"0.1"` | 10% of new traces |
+| `TRACES_SAMPLING_PROBABILITY` | `"0.1"` | 10% of new traces (parent-based) |
 
-The sampler uses the SDK's standard env vars, which the Python SDK reads natively, so no code parses
-them - the ratio can be changed by editing the ConfigMap and restarting the pods. 10% is deliberate:
+The ratio can be changed by editing the ConfigMap and restarting the pods. 10% is deliberate:
 a k6 run against a 5Gi PVC with 3-day retention (see `k8s/observability/openobserve-values.yaml`)
 would otherwise fill it quickly. Set `"1.0"` temporarily when debugging, and expect to need a burst
 of ~50+ requests to see anything at 0.1.
@@ -103,6 +83,10 @@ service:
   `k8s/observability/kustomization.yaml`), so a merged config change rolls the collector by itself.
 
 ## Verification
+
+> **Historical:** the live results below were measured on the previous (Python/FastAPI, Hazelcast) implementation and
+> are kept as a record of the pipeline check; span names and the `hazelcast.*` spans no longer exist. The collector and
+> OpenObserve steps still apply.
 
 **Collector → OpenObserve (verified live).** A synthetic OTLP span posted to the collector appeared
 in OpenObserve as `tracing-smoke-test / smoke-span`, with no export errors in the collector log:
