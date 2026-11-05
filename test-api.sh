@@ -16,7 +16,7 @@ OPTS=(-emit-defaults -max-time 15)   # -emit-defaults: a message at version 0 st
 [ "${PLAINTEXT}" = "true" ] && OPTS+=(-plaintext)
 
 echo "=========================================================="
-echo " Testing Spring Boot gRPC API (Cloud SQL + Hazelcast)"
+echo " Testing Rust gRPC API (Cloud SQL + Redis)"
 echo " Target: ${GRPC_ADDR} (plaintext=${PLAINTEXT})"
 echo "=========================================================="
 
@@ -86,7 +86,7 @@ expect "duplicate email is AlreadyExists" AlreadyExists "${CODE}"
 expect "reason is CONFLICT" CONFLICT "$(reason)"
 
 echo -e "\n4. Create a valid message:"
-call ${MSG}/CreateMessage "{\"title\":\"GKE Deployment\",\"content\":\"Spring Boot gRPC running on GKE!\",\"author_id\":\"${AUTHOR_ID}\"}"
+call ${MSG}/CreateMessage "{\"title\":\"GKE Deployment\",\"content\":\"Rust gRPC running on GKE!\",\"author_id\":\"${AUTHOR_ID}\"}"
 expect "create message is OK" OK "${CODE}"
 MSG_ID=$(echo "${BODY}" | jq -r .id)
 expect "new message is at version 0" 0 "$(echo "${BODY}" | jq -r .version)"

@@ -1,3 +1,5 @@
+> **Historical record.** This is the original Spring Boot / Hazelcast README, kept for reference. Names such as `springboot-grpc-o2` and `ci-springboot-grpc-o2` are the old project's; the Rust port uses `gke-rust-api-o2` (registry), `ci-rust-api-o2` (CI SA) and the `rust-api-o2` Argo CD Application.
+
 # Message Service (Spring Boot + gRPC + PostgreSQL on GKE)
 
 A gRPC API (Java 21, Spring Boot 4, [Spring gRPC](https://docs.spring.io/spring-grpc/reference/)) for
