@@ -65,7 +65,7 @@ NODE_SA="gke-dev-nodes"
 CROSSPLANE_SA="crossplane-gcp"          # KSA crossplane-system/provider-gcp
 ESO_SA="external-secrets"               # KSA external-secrets/external-secrets
 IMAGE_UPDATER_SA="argocd-image-updater" # KSA argocd/argocd-image-updater
-CI_SA="ci-springboot-grpc-o2"   # one CI service account per project
+CI_SA="ci-rust-api-o2"   # one CI service account per project
 WIF_POOL="github"
 WIF_PROVIDER="github-oidc"
 
