@@ -74,7 +74,7 @@ grpcurl -d '{"id": "<MESSAGE_ID>"}' $ADDR $M/GetMessage
 ```
 
 `GetMessage` embeds the author. The first read of a message loads it from Postgres and populates the
-Hazelcast cache; later reads are served from the cache until the message is updated or deleted.
+Redis cache; later reads are served from the cache until the message is updated or deleted.
 
 ### 5. Create an author
 

@@ -8,6 +8,7 @@ target
 tests
 k8s
 scripts
+docs
 *.md
 *.sh
 k6-*.js

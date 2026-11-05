@@ -67,23 +67,21 @@ mount) is still set. The exception is synced by ArgoCD from `main`.
 
 ## Application log format
 
-message-service writes **one JSON object per line to stdout** (`app/logging.py`; uvicorn's and
-Alembic's own logging is routed through the same formatter), so the CRI line the collector ships is
-`<time> stdout F {"message": ..., "timestamp": ..., "level": ..., "logger": ..., ...}`. Fields:
+message-service (Rust, `src/telemetry.rs`) writes **one JSON object per line to stdout** (`LOG_FORMAT=text` switches to
+human-readable output for local runs), so the CRI line the collector ships is
+`<time> stdout F {"timestamp": ..., "level": ..., "message": ..., "target": ..., ...}`. Fields:
 
 | Field | Notes |
 | :--- | :--- |
-| `timestamp` | ISO-8601 UTC, millisecond precision |
-| `level` | `INFO`, `WARNING`, `ERROR`, ... |
+| `timestamp` | RFC 3339 UTC |
+| `level` | `INFO`, `WARN`, `ERROR`, ... |
 | `message` | The log message |
-| `logger` | The Python logger name (`app.main`, `app.access`, `uvicorn.error`, `alembic.runtime.migration`, ...) |
-| `trace_id`, `span_id` | Present when a span is active - copy `trace_id` into OpenObserve's Traces view to jump from a log line to its trace |
-| extras | e.g. `method`, `route`, `status_code`, `duration_ms` on the per-request `app.access` line |
+| `target` | The Rust module path (`message_service`, `message_service::cache`, ...) |
+| `span` | The current span (`grpc.request` with `rpc_service`, `rpc_method`, ...) when a request is in flight |
+| extras | event fields, e.g. `operation` / `error` on a degraded cache operation |
 
-`app.access` logs one line per request, with the route *template*; `/health/*` probes are not
-logged (uvicorn's own access log is off). An unhandled exception is logged with its stack trace
-(and the active `trace_id`), while the client only ever gets a generic 500. Request bodies and
-credentials are never logged.
+Cache failures are logged at `WARN` ("cache operation failed; degrading to the database") and never fail a request.
+Request bodies and credentials are never logged.
 
 ## Verification (live, 2026-09-23)
 

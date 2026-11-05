@@ -16,7 +16,7 @@ OPTS=(-emit-defaults -max-time 15)   # -emit-defaults: a message at version 0 st
 [ "${PLAINTEXT}" = "true" ] && OPTS+=(-plaintext)
 
 echo "=========================================================="
-echo " Testing Rust gRPC API (Cloud SQL + Redis)"
+echo " Testing Rust gRPC API (Cloud SQL + Memorystore Redis)"
 echo " Target: ${GRPC_ADDR} (plaintext=${PLAINTEXT})"
 echo "=========================================================="
 

@@ -1,0 +1,20 @@
+# cargo-audit configuration. Only advisories with NO available fix that do not affect the shipped
+# (normal, non-dev) dependency tree are ignored. New advisories still fail `cargo audit`.
+# Verify before re-reviewing: `cargo tree -i <crate> --edges normal --target all`.
+
+[advisories]
+ignore = [
+    # rsa 0.9.x (Marvin timing attack), no fixed release. Lockfile-only: pulled in by the optional
+    # sqlx-mysql, which this crate never enables (sqlx features: postgres only). It is not in the
+    # resolved tree (`cargo tree -i rsa --edges all --target all` prints nothing).
+    # Re-review: when rsa publishes a fix, or if a mysql feature is ever enabled.
+    "RUSTSEC-2023-0071",
+
+    # tokio-tar 0.3.1 (PAX header parsing), no fixed release. Dev-only: reachable solely through
+    # testcontainers (dev-dependency) and never linked into the shipped binary.
+    # Re-review: when testcontainers drops/replaces tokio-tar.
+    "RUSTSEC-2025-0111",
+]
+
+# Not ignored: the rustls-pemfile "unmaintained" warning (via bollard <- testcontainers, dev-only).
+# Warnings do not fail `cargo audit` by default, so it stays visible but non-failing.

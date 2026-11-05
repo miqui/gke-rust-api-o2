@@ -502,7 +502,7 @@ $(printf '\033[1;32mDone.\033[0m') Cluster '$CLUSTER' and its GCP foundation are
   $( [[ $DNS_DONE == 1 ]] && echo "  (upserted via the Cloudflare API)" || echo "  Set CLOUDFLARE_API_TOKEN to automate this, or add both records by hand." )
   Certificate $CERT state: ${CERT_STATE:-unknown} (ACTIVE once the CNAME resolves; first issue ~15-60 min)
 
-  GitHub repo variables for .github/workflows/message-service-ci.yml
+  GitHub repo variables for .github/workflows/rust-ci.yml
   (Settings -> Secrets and variables -> Actions -> Variables):
     GCP_WIF_PROVIDER = ${WIF_PROVIDER_NAME}
     GCP_CI_SA        = $(sa_email "$CI_SA")
