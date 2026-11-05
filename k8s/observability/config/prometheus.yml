@@ -1,8 +1,9 @@
 global:
   scrape_interval: 15s
 
-# Replicates the message-service metrics (job "otel-collector" below - the API's
-# Micrometer gRPC/JVM/HikariCP metrics pushed via OTLP, see application.yaml) plus
+# Replicates the message-service metrics (job "message-service" below - the Rust API's own
+# /metrics endpoint on the management port; job "otel-collector" carries whatever the API
+# pushes via OTLP) plus
 # cluster ops metrics (node-exporter, kube-state-metrics - the same jobs behind
 # the "Cluster ops" Grafana dashboard) into OpenObserve (see
 # k8s/observability/openobserve-values.yaml), which exposes a Prometheus
@@ -28,7 +29,7 @@ remote_write:
       password_file: /etc/prometheus/openobserve-auth/password
     write_relabel_configs:
       - source_labels: [job]
-        regex: 'otel-collector|node-exporter|kube-state-metrics|kubernetes-nodes-cadvisor'
+        regex: 'otel-collector|message-service|node-exporter|kube-state-metrics|kubernetes-nodes-cadvisor'
         action: keep
 
 scrape_configs:
@@ -54,15 +55,28 @@ scrape_configs:
     static_configs:
       - targets: ['postgres-exporter.default.svc.cluster.local:9187']
 
-  # jmx_prometheus_javaagent attached to the Hazelcast member's own JVM (see
-  # k8s/hazelcast-deployment.yaml) - Management Center's own Prometheus exporter
-  # (hazelcast.mc.prometheusExporter.enabled, see
-  # https://docs.hazelcast.com/management-center/5.11/integrate/prometheus-monitoring) turned
-  # out to require a paid Enterprise license (confirmed live: 402 LICENSE_REQUIRED), so this
-  # scrapes the member directly instead - same underlying metrics, no license needed.
-  - job_name: 'hazelcast'
-    static_configs:
-      - targets: ['hazelcast.default.svc.cluster.local:9404']
+  # message-service pods: Prometheus metrics on the management port (:8081/metrics). Pods are
+  # discovered through the API (they change IPs and scale with the HPA); the network policy in
+  # k8s/networkpolicies.yaml allows exactly this flow.
+  - job_name: 'message-service'
+    metrics_path: /metrics
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names: ['default']
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        regex: message-service
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_container_port_name]
+        regex: mgmt
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+      # The Grafana gRPC/RED dashboards select on service_name="message-service" (the label the
+      # OTLP pipeline used to add). The Rust app's own /metrics has no such label, so add it here.
+      - target_label: service_name
+        replacement: message-service
 
   # Trivy Operator (k8s/argocd/apps/trivy-operator.yaml): per-workload counts of
   # vulnerabilities, config-audit/RBAC/infra findings, exposed secrets and compliance status.

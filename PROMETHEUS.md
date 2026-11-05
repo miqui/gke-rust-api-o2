@@ -28,7 +28,7 @@ in `k8s/observability/openobserve-values.yaml`) could hold.
 ## 2. Scoped remote_write to just the API's own metrics
 
 Added `write_relabel_configs` to keep only the `otel-collector` job (the message-service's own
-FastAPI/SQLAlchemy metrics, pushed via OTLP — see `app/telemetry.py`) before it reaches
+gRPC/cache metrics, scraped from `:8081/metrics` or pushed via OTLP — see `src/metrics.rs`) before it reaches
 OpenObserve:
 
 ```yaml
@@ -125,6 +125,6 @@ scrape_configs:
     static_configs:
       - targets: ['openobserve.observability.svc.cluster.local:5080']
 
-  # ... postgres-exporter, hazelcast, node-exporter, kubernetes-nodes-cadvisor jobs
+  # ... postgres-exporter, node-exporter, kubernetes-nodes-cadvisor jobs
   # pre-existed this work and are unchanged - see config/prometheus.yml for the full file.
 ```

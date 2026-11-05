@@ -1,9 +1,10 @@
 # ArgoCD Application syncing k8s/ - the message-service and everything it needs in `default`:
-# its PostgresInstance (Cloud SQL via the platform's Crossplane Composition) + postgres-exporter,
-# the ExternalSecret for its DB password, Hazelcast, the Deployment/Service/HPA, the public
+# its PostgresInstance (Cloud SQL) + postgres-exporter and its RedisInstance (Memorystore for
+# Redis) - both via the platform's Crossplane Compositions - the ExternalSecret for its DB
+# password, the Deployment/Service/HPA, the public
 # Gateway (grpc.miqui.dev) and the namespace's NetworkPolicies and ResourceQuota - everything
 # k8s/kustomization.yaml produces. Last wave: it needs the policies, the secret store and the
-# PostgresInstance API to exist first.
+# PostgresInstance/RedisInstance APIs to exist first.
 #
 # Which image tag message-service runs is decided by Argo CD Image Updater (see
 # k8s/argocd/image-updater/), which writes it into spec.source.kustomize of this Application -
@@ -11,14 +12,14 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: springboot-grpc-o2
+  name: rust-api-o2
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   project: default
   source:
-    repoURL: https://github.com/miqui/gke-springboot-grpc-o2.git
+    repoURL: https://github.com/miqui/gke-rust-api-o2.git
     targetRevision: main
     path: k8s
   destination:

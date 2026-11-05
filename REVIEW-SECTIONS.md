@@ -17,7 +17,7 @@ The order below is the recommended review sequence.
 | --- | --- | --- |
 | 1 | **GKE infrastructure** | Bootstrap/deploy/teardown safety, networking, Gateway/TLS, IAM, probes, autoscaling, quotas, rollout behavior |
 | 2 | **GitOps/platform** | Argo CD reconciliation, image updates and rollback, Crossplane provisioning, External Secrets, resource ownership |
-| 3 | **Data/cache operations** | Migrations, indexes, connection pooling, recovery requirements, Hazelcast capacity and failure handling |
+| 3 | **Data/cache operations** | Migrations, indexes, connection pooling, recovery requirements, Redis (Memorystore) capacity and failure handling |
 | 4 | **Observability** | Metrics/traces/log completeness, useful dashboards and alerts, cardinality, collector failures, retention costs |
 | 5 | **Delivery/tooling** | Docker reproducibility, Compose, image-publishing workflow, policy checks, scanners, smoke/load-test scripts |
 | 6 | **API test depth/resilience** | Improve real cache-adapter coverage; exercise lock contention, disconnects, timeouts, and concurrent mutations under load |
@@ -29,5 +29,5 @@ The order below is the recommended review sequence.
 
 Merged code does not confirm deployment or client adoption. Verify:
 
-- The initial cache-locking cutover: stop old replicas and clear the Hazelcast `messages` map before starting replicas using the locking protocol.
+- The initial cache-locking cutover: stop old replicas and clear the `messages:*` Redis keys before starting replicas using the locking protocol.
 - Clients needing all author messages follow the pagination continuation introduced in PR #3.

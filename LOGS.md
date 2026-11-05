@@ -1,6 +1,6 @@
 # Pod logs → OpenObserve
 
-Container logs from the `default` namespace (message-service, postgres, hazelcast)
+Container logs from the `default` namespace (message-service, postgres-exporter)
 are tailed off the nodes by an OTel Collector DaemonSet and shipped to OpenObserve. Metrics
 (`PROMETHEUS.md`) and traces (`TRACING.md`) already go there; this adds the third signal.
 

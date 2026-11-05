@@ -97,7 +97,7 @@ log "Applying root Application (app of apps: k8s/argocd/apps/)"
 kubectl apply -f k8s/argocd/root-application.yaml
 
 # ---- 3. Wait for everything -----------------------------------------------------------
-# Cloud SQL provisioning dominates: ~10-15 min after the springboot-grpc-o2 wave starts.
+# Cloud SQL provisioning dominates (Memorystore ~5 min): ~10-15 min after the rust-api-o2 wave starts.
 log "Waiting for all Applications to be Synced + Healthy (timeout ${SYNC_TIMEOUT_MIN}m)"
 deadline=$(( $(date +%s) + SYNC_TIMEOUT_MIN * 60 ))
 while :; do
@@ -116,7 +116,7 @@ while :; do
   if [[ $(date +%s) -ge $deadline ]]; then
     echo "ERROR: timed out. Current state:" >&2
     echo "$status" >&2
-    echo "Inspect: kubectl get applications -n argocd; kubectl get postgresinstance,managed -A" >&2
+    echo "Inspect: kubectl get applications -n argocd; kubectl get postgresinstance,redisinstance,managed -A" >&2
     exit 1
   fi
   sleep 30

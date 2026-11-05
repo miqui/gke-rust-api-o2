@@ -1,4 +1,4 @@
-# k8s/platform/: the Secret Manager ClusterSecretStore, Crossplane's GCP Cloud SQL provider +
+# k8s/platform/: the Secret Manager ClusterSecretStore, Crossplane's GCP Cloud SQL + Memorystore providers +
 # functions + credentials config, and the PostgresInstance API. Needs the CRDs from the
 # external-secrets and crossplane Applications (previous wave); inside, its own sync waves put
 # the Crossplane packages before the objects whose CRDs they install.
@@ -12,7 +12,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/miqui/gke-springboot-grpc-o2.git
+    repoURL: https://github.com/miqui/gke-rust-api-o2.git
     targetRevision: main
     path: k8s/platform
   destination:

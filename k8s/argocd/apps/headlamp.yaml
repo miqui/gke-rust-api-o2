@@ -12,7 +12,7 @@ metadata:
 spec:
   project: default
   sources:
-    - repoURL: https://github.com/miqui/gke-springboot-grpc-o2.git
+    - repoURL: https://github.com/miqui/gke-rust-api-o2.git
       targetRevision: main
       ref: values
     - repoURL: https://kubernetes-sigs.github.io/headlamp/
@@ -22,7 +22,7 @@ spec:
         releaseName: headlamp
         valueFiles:
           - $values/k8s/headlamp/headlamp-values.yaml
-    - repoURL: https://github.com/miqui/gke-springboot-grpc-o2.git
+    - repoURL: https://github.com/miqui/gke-rust-api-o2.git
       targetRevision: main
       path: k8s/headlamp/manifests
   destination:

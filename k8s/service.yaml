@@ -16,7 +16,7 @@ spec:
       protocol: TCP
       name: grpc
       appProtocol: kubernetes.io/h2c
-    # Actuator: the LB health check (see gateway.yaml) and nothing else. Not routed publicly.
+    # Management port (/livez, /readyz, /metrics): the LB health check (see gateway.yaml) and nothing else. Not routed publicly.
     - port: 8081
       targetPort: mgmt
       protocol: TCP

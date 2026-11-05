@@ -7,10 +7,11 @@
 #   - Zonal cluster (no HA): 1 managed control plane, e2-standard-2 workers, autoscaling 3..5
 #   - Dedicated VPC + subnet with Private Google Access
 #   - Private nodes (no external IPs); control plane locked to operator's IP
-#   - Cloud Router + Cloud NAT for node/pod egress (public images, Hazelcast's JMX agent download)
+#   - Cloud Router + Cloud NAT for node/pod egress (public images)
 #   - Dataplane V2 (NetworkPolicy enforcement), Workload Identity, Gateway API, Shielded Nodes
 #   - Dedicated least-privilege node service account (not the Editor-role default compute SA)
-#   - Private Service Access range + peering so Cloud SQL (created by Crossplane) gets a private IP
+#   - Private Service Access range + peering so Cloud SQL and Memorystore for Redis (both created
+#     by Crossplane) get a private IP
 #   - Artifact Registry repo in-region (image streaming; pulls bypass NAT) with a cleanup policy
 #   - Workload Identity GSAs for in-cluster controllers: Crossplane, External Secrets, Image Updater
 #   - Keyless GitHub Actions → Artifact Registry push (Workload Identity Federation, no JSON keys)
@@ -164,6 +165,7 @@ gcloud services enable \
   compute.googleapis.com \
   artifactregistry.googleapis.com \
   sqladmin.googleapis.com \
+  redis.googleapis.com \
   servicenetworking.googleapis.com \
   secretmanager.googleapis.com \
   certificatemanager.googleapis.com \
@@ -187,7 +189,7 @@ project_role() { # project_role <sa id> <role>
 
 log "Creating service accounts"
 ensure_sa "$NODE_SA"          "GKE dev-cluster nodes"
-ensure_sa "$CROSSPLANE_SA"    "Crossplane GCP provider (Cloud SQL)"
+ensure_sa "$CROSSPLANE_SA"    "Crossplane GCP provider (Cloud SQL, Memorystore)"
 ensure_sa "$ESO_SA"           "External Secrets Operator (Secret Manager reader)"
 ensure_sa "$IMAGE_UPDATER_SA" "Argo CD Image Updater (Artifact Registry reader)"
 ensure_sa "$CI_SA"            "GitHub Actions image push"
@@ -196,8 +198,10 @@ log "Granting project roles"
 # Node SA: logging/monitoring/metadata only (the predefined role GKE recommends for custom node
 # SAs). Image pulls are granted on the repo itself in step 6, not project-wide.
 project_role "$NODE_SA" roles/container.defaultNodeServiceAccount
-# Crossplane creates/deletes Cloud SQL instances attached to the VPC by private IP.
+# Crossplane creates/deletes Cloud SQL and Memorystore for Redis instances attached to the VPC by
+# private IP.
 project_role "$CROSSPLANE_SA" roles/cloudsql.admin
+project_role "$CROSSPLANE_SA" roles/redis.admin
 project_role "$CROSSPLANE_SA" roles/compute.networkUser
 # ESO gets secretAccessor per secret (gke-secrets-seed.sh), not project-wide.
 
@@ -342,7 +346,8 @@ wi_bind() { # wi_bind <gsa id> <namespace> <ksa>
   echo "    $2/$3 -> $1"
 }
 log "Binding Kubernetes ServiceAccounts to GCP service accounts (Workload Identity)"
-wi_bind "$CROSSPLANE_SA"    crossplane-system provider-gcp
+wi_bind "$CROSSPLANE_SA"    crossplane-system provider-gcp        # Cloud SQL provider
+wi_bind "$CROSSPLANE_SA"    crossplane-system provider-gcp-redis  # Memorystore provider
 wi_bind "$ESO_SA"           external-secrets  external-secrets
 wi_bind "$IMAGE_UPDATER_SA" argocd            argocd-image-updater
 

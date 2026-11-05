@@ -11,8 +11,8 @@ spec:
     name: message-service
   minReplicas: 3
   maxReplicas: 6
-  # CPU only. A JVM keeps the heap it has grown to (memory use tracks the -XX:MaxRAMPercentage
-  # ceiling, not load), so a memory target would pin the Deployment at maxReplicas.
+  # CPU only: the pod's memory is a small, nearly flat footprint, so a memory target would say
+  # nothing about load.
   metrics:
     - type: Resource
       resource:

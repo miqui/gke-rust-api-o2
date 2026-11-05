@@ -1,0 +1,75 @@
+# RedisInstance: the platform's "give me a Redis" API. An application declares one in its own
+# namespace (k8s/redis.yaml) without knowing anything about Memorystore; the Composition in
+# redis-composition.yaml decides how it's provided. Mirrors postgres-xrd.yaml.
+#
+# Namespaced (Crossplane v2): the composed Memorystore resource and the connection Secret land in
+# the same namespace as the RedisInstance, next to the workloads that use them.
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: redisinstances.platform.miqui.dev
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  scope: Namespaced
+  group: platform.miqui.dev
+  names:
+    kind: RedisInstance
+    plural: redisinstances
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      additionalPrinterColumns:
+        - name: INSTANCE
+          type: string
+          jsonPath: .status.instanceName
+        - name: HOST
+          type: string
+          jsonPath: .status.host
+        - name: TIER
+          type: string
+          jsonPath: .spec.tier
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - connectionSecretName
+              properties:
+                tier:
+                  description: >-
+                    Memorystore service tier. BASIC is a single node with no replica (a failure or
+                    maintenance flushes the cache - fine for a cache in the short-lived dev
+                    cluster); STANDARD_HA adds a replica in another zone with automatic failover.
+                  type: string
+                  default: BASIC
+                  enum: [BASIC, STANDARD_HA]
+                memorySizeGb:
+                  type: integer
+                  default: 1
+                  minimum: 1
+                version:
+                  type: string
+                  default: REDIS_7_2
+                  enum: [REDIS_6_X, REDIS_7_0, REDIS_7_2]
+                connectionSecretName:
+                  description: >-
+                    Secret (same namespace) the Composition writes with the keys host, port and
+                    ca.crt (the Memorystore server CA, PEM). The AUTH string is written by the
+                    provider to a second Secret named "<connectionSecretName>-auth" under the key
+                    attribute.auth_string.
+                  type: string
+            status:
+              type: object
+              properties:
+                instanceName:
+                  type: string
+                host:
+                  type: string
+                port:
+                  type: string
+                caCert:
+                  type: string

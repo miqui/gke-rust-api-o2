@@ -1,5 +1,5 @@
 # Argo CD Image Updater: chart + values, plus the ImageUpdater CR (k8s/argocd/image-updater/)
-# that tells it to watch Artifact Registry for new message-service tags and point the springboot-grpc-o2
+# that tells it to watch Artifact Registry for new message-service tags and point the rust-api-o2
 # Application at them. The CR's CRD comes from the chart, hence SkipDryRunOnMissingResource.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -11,7 +11,7 @@ metadata:
 spec:
   project: default
   sources:
-    - repoURL: https://github.com/miqui/gke-springboot-grpc-o2.git
+    - repoURL: https://github.com/miqui/gke-rust-api-o2.git
       targetRevision: main
       ref: values
     - repoURL: https://argoproj.github.io/argo-helm
@@ -21,7 +21,7 @@ spec:
         releaseName: argocd-image-updater
         valueFiles:
           - $values/k8s/argocd/image-updater-values.yaml
-    - repoURL: https://github.com/miqui/gke-springboot-grpc-o2.git
+    - repoURL: https://github.com/miqui/gke-rust-api-o2.git
       targetRevision: main
       path: k8s/argocd/image-updater
   destination:
