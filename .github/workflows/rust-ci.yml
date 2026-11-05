@@ -177,8 +177,24 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
+      # Skip cleanly (green) until the repo variables GCP_WIF_PROVIDER / GCP_CI_SA are set
+      # (values are printed by gke-deploy.sh).
+      - name: Check GCP publish configuration
+        id: precheck
+        env:
+          WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
+          CI_SA: ${{ vars.GCP_CI_SA }}
+        run: |
+          if [ -z "$WIF_PROVIDER" ] || [ -z "$CI_SA" ]; then
+            echo "::notice title=Image publish skipped::Repo variables GCP_WIF_PROVIDER and/or GCP_CI_SA are not set; skipping image push. Set them (see gke-deploy.sh output) to enable publishing."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Authenticate to Google Cloud
         id: gcp
+        if: steps.precheck.outputs.enabled == 'true'
         uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
         with:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
@@ -186,6 +202,7 @@ jobs:
           token_format: access_token
 
       - name: Log in to Artifact Registry
+        if: steps.precheck.outputs.enabled == 'true'
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -196,10 +213,12 @@ jobs:
       # "alphabetical" strategy picks the highest tag) while still identifying the commit.
       - name: Compute image tag
         id: meta
+        if: steps.precheck.outputs.enabled == 'true'
         run: echo "tag=$(date -u +%Y%m%d%H%M%S)-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       # amd64 only: GKE's e2 nodes are x86_64.
       - name: Build and push
+        if: steps.precheck.outputs.enabled == 'true'
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
