@@ -39,7 +39,7 @@ VPC="${VPC:-dev-vpc}"
 SUBNET="${SUBNET:-dev-subnet}"
 ROUTER="${ROUTER:-dev-router}"
 NAT="${NAT:-dev-nat}"
-REPO="${REPO:-springboot-grpc-o2}"   # one Artifact Registry repo per project
+REPO="${REPO:-gke-rust-api-o2}"   # one Artifact Registry repo per project
 MACHINE_TYPE="${MACHINE_TYPE:-e2-standard-2}"
 MIN_NODES="${MIN_NODES:-3}"
 MAX_NODES="${MAX_NODES:-5}"
@@ -48,7 +48,7 @@ MAX_NODES="${MAX_NODES:-5}"
 NODE_DISK_SIZE_GB="${NODE_DISK_SIZE_GB:-30}"
 DOMAIN="${DOMAIN:-miqui.dev}"
 API_HOST="${API_HOST:-grpc.${DOMAIN}}"
-GITHUB_REPO="${GITHUB_REPO:-miqui/gke-springboot-grpc-o2}"
+GITHUB_REPO="${GITHUB_REPO:-miqui/gke-rust-api-o2}"
 
 SUBNET_RANGE="10.0.0.0/20"
 PODS_RANGE="10.4.0.0/14"
@@ -65,7 +65,7 @@ NODE_SA="gke-dev-nodes"
 CROSSPLANE_SA="crossplane-gcp"          # KSA crossplane-system/provider-gcp
 ESO_SA="external-secrets"               # KSA external-secrets/external-secrets
 IMAGE_UPDATER_SA="argocd-image-updater" # KSA argocd/argocd-image-updater
-CI_SA="ci-springboot-grpc-o2"   # one CI service account per project
+CI_SA="ci-rust-api-o2"   # one CI service account per project
 WIF_POOL="github"
 WIF_PROVIDER="github-oidc"
 
@@ -497,7 +497,7 @@ $(printf '\033[1;32mDone.\033[0m') Cluster '$CLUSTER' and its GCP foundation are
   $( [[ $DNS_DONE == 1 ]] && echo "  (upserted via the Cloudflare API)" || echo "  Set CLOUDFLARE_API_TOKEN to automate this, or add both records by hand." )
   Certificate $CERT state: ${CERT_STATE:-unknown} (ACTIVE once the CNAME resolves; first issue ~15-60 min)
 
-  GitHub repo variables for .github/workflows/message-service-ci.yml
+  GitHub repo variables for .github/workflows/rust-ci.yml
   (Settings -> Secrets and variables -> Actions -> Variables):
     GCP_WIF_PROVIDER = ${WIF_PROVIDER_NAME}
     GCP_CI_SA        = $(sa_email "$CI_SA")

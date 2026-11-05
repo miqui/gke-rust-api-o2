@@ -35,7 +35,7 @@ VPC="${VPC:-dev-vpc}"
 SUBNET="${SUBNET:-dev-subnet}"
 ROUTER="${ROUTER:-dev-router}"
 NAT="${NAT:-dev-nat}"
-REPO="${REPO:-springboot-grpc-o2}"
+REPO="${REPO:-gke-rust-api-o2}"
 DOMAIN="${DOMAIN:-miqui.dev}"
 API_HOST="${API_HOST:-grpc.${DOMAIN}}"
 
@@ -46,7 +46,7 @@ DNS_AUTH="grpc-dns-auth"
 CERT="grpc-cert"
 CERT_MAP="grpc-cert-map"
 CERT_MAP_ENTRY="grpc-cert-map-entry"
-SERVICE_ACCOUNTS=(gke-dev-nodes crossplane-gcp external-secrets argocd-image-updater ci-springboot-grpc-o2)
+SERVICE_ACCOUNTS=(gke-dev-nodes crossplane-gcp external-secrets argocd-image-updater ci-rust-api-o2)
 PROJECT_ROLES=(
   "gke-dev-nodes=roles/container.defaultNodeServiceAccount"
   "crossplane-gcp=roles/cloudsql.admin"

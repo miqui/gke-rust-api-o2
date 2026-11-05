@@ -1,0 +1,213 @@
+name: rust CI
+
+# Quality checks run on EVERY pull request (so required status checks never stay pending);
+# expensive jobs are skipped via path filtering, and a skipped job counts as passing for branch
+# protection. Image publishing happens only on main.
+on:
+  push:
+    branches: [main]
+  pull_request: {}
+  workflow_dispatch: {}
+
+# Image: us-central1-docker.pkg.dev/<project>/gke-rust-api-o2/gke-rust-api-o2 (Artifact Registry;
+# repository name matches REPO in gke-deploy.sh).
+# Pushing is keyless: GitHub's OIDC token is exchanged through Workload Identity Federation for a
+# short-lived token of the CI service account (vars GCP_WIF_PROVIDER / GCP_CI_SA, printed by
+# gke-deploy.sh). The provider only accepts this repo's main branch, so PRs can never push.
+# No LLM or other API secrets are used anywhere.
+env:
+  REGISTRY: us-central1-docker.pkg.dev
+  IMAGE: us-central1-docker.pkg.dev/k8s-dev-412419/gke-rust-api-o2/gke-rust-api-o2
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      rust: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.rust == 'true' }}
+      image: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.image == 'true' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Filter paths
+        id: filter
+        if: github.event_name != 'workflow_dispatch'
+        uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3
+        with:
+          base: main
+          filters: |
+            rust:
+              - "src/**"
+              - "proto/**"
+              - "third_party/**"
+              - "migrations/**"
+              - "tests/**"
+              - "build.rs"
+              - "Cargo.toml"
+              - "Cargo.lock"
+              - "rust-toolchain.toml"
+              - "clippy.toml"
+              - "rustfmt.toml"
+              - ".cargo/**"
+              - "Dockerfile"
+              - ".dockerignore"
+              - ".github/workflows/rust-ci.yml"
+            image:
+              - "src/**"
+              - "proto/**"
+              - "third_party/**"
+              - "migrations/**"
+              - "build.rs"
+              - "Cargo.toml"
+              - "Cargo.lock"
+              - "rust-toolchain.toml"
+              - "Dockerfile"
+              - ".dockerignore"
+              - ".github/workflows/rust-ci.yml"
+
+  fmt:
+    name: Rust fmt
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install pinned toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - name: cargo fmt --check
+        run: cargo fmt --all --check
+
+  clippy:
+    name: Rust clippy
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends protobuf-compiler
+      - name: Install pinned toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+      - name: cargo clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+  test:
+    name: Rust test
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends protobuf-compiler
+      - name: Install pinned toolchain (rust-toolchain.toml)
+        run: rustup toolchain install
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+      # The integration/conformance tests start Postgres 16 and Redis 7 with testcontainers; the
+      # ubuntu runner ships Docker. REQUIRE_INTEGRATION=1 turns "no Docker available" into a
+      # failure instead of silently skipping the DB-backed tests.
+      - name: cargo test
+        env:
+          REQUIRE_INTEGRATION: "1"
+        run: cargo test --locked --all-targets
+
+  audit:
+    name: Rust audit (non-blocking)
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2
+        with:
+          tool: cargo-audit
+      - name: cargo audit
+        run: cargo audit
+
+  docker-build:
+    name: Docker build (no push)
+    needs: changes
+    if: needs.changes.outputs.image == 'true' && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Build image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build-and-push:
+    name: Build and push image
+    needs: [changes, fmt, clippy, test]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && needs.changes.outputs.image == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Authenticate to Google Cloud
+        id: gcp
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_CI_SA }}
+          token_format: access_token
+
+      - name: Log in to Artifact Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: oauth2accesstoken
+          password: ${{ steps.gcp.outputs.access_token }}
+
+      # <UTC yyyymmddHHMMSS>-<7-char sha>: sorts lexically by build time (Argo CD Image Updater's
+      # "alphabetical" strategy picks the highest tag) while still identifying the commit.
+      - name: Compute image tag
+        id: meta
+        run: echo "tag=$(date -u +%Y%m%d%H%M%S)-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      # amd64 only: GKE's e2 nodes are x86_64.
+      - name: Build and push
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.meta.outputs.tag }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -24,7 +24,7 @@ cd "$(dirname "$0")"
 PROJECT_ID="${PROJECT_ID:?PROJECT_ID is required, e.g. PROJECT_ID=k8s-dev-412419 ./gke-bootstrap.sh}"
 ZONE="${ZONE:-us-central1-a}"
 CLUSTER="${CLUSTER:-dev-cluster}"
-GITHUB_REPO="${GITHUB_REPO:-miqui/gke-springboot-grpc-o2}"
+GITHUB_REPO="${GITHUB_REPO:-miqui/gke-rust-api-o2}"
 API_HOST="${API_HOST:-grpc.miqui.dev}"
 # Must match k8s/argocd/apps/argocd.yaml, which takes over this release after bootstrap.
 ARGOCD_CHART_VERSION="10.9.2"
